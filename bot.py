@@ -112,29 +112,71 @@ def build_options(question):
     """
     ساخت گزینه‌ها برای سؤال.
 
-    اگر فیلد «گزینه‌ها» وجود داشته باشد، همان استفاده می‌شود.
-    در غیر این صورت از «پاسخ صحیح» و «سایر گزینه‌های چالشی»
-    گزینه‌ها ساخته می‌شوند.
+    سؤال صحیح/غلط:
+    دقیقاً دو گزینه «صحیح» و «غلط» ساخته می‌شود.
+
+    سؤال چندگزینه‌ای:
+    ابتدا از «گزینه‌ها» استفاده می‌شود.
+    در غیر این صورت از «پاسخ صحیح» و
+    «سایر گزینه‌های چالشی» ساخته می‌شود.
     """
+
+    question_type = str(
+        question.get("نوع سؤال", "")
+    ).strip()
+
+    # سؤال‌های صحیح / غلط
+    if question_type in [
+        "صحیح/غلط",
+        "صحیح یا غلط",
+        "درست/غلط",
+        "درست یا غلط",
+        "صحیح-غلط",
+    ]:
+        return ["صحیح", "غلط"]
 
     options = question.get("گزینه‌ها")
 
-    if isinstance(options, list) and len(options) >= 2:
-        return options
+    if isinstance(options, list):
+        clean_options = []
+
+        for option in options:
+            if option is None:
+                continue
+
+            option = str(option).strip()
+
+            if not option:
+                continue
+
+            if option in ["-", "—", "–"]:
+                continue
+
+            if option not in clean_options:
+                clean_options.append(option)
+
+        if len(clean_options) >= 2:
+            return clean_options
 
     correct_answer = question.get("پاسخ صحیح")
 
     if not correct_answer:
         return None
 
-    other_options = question.get("سایر گزینه‌های چالشی", [])
+    correct_answer = str(correct_answer).strip()
+
+    if not correct_answer or correct_answer in ["-", "—", "–"]:
+        return None
+
+    other_options = question.get(
+        "سایر گزینه‌های چالشی",
+        []
+    )
 
     if isinstance(other_options, list):
         others = other_options[:]
 
     elif isinstance(other_options, str):
-        # پشتیبانی از فرمت‌هایی مثل:
-        # "گوش, زبان, صورت"
         others = [
             item.strip()
             for item in other_options.split(",")
@@ -146,10 +188,21 @@ def build_options(question):
 
     options = [correct_answer] + others
 
-    # حذف موارد تکراری بدون تغییر ترتیب
+    # حذف گزینه‌های خالی و خط تیره
     unique_options = []
 
     for option in options:
+        if option is None:
+            continue
+
+        option = str(option).strip()
+
+        if not option:
+            continue
+
+        if option in ["-", "—", "–"]:
+            continue
+
         if option not in unique_options:
             unique_options.append(option)
 
@@ -279,7 +332,7 @@ def start_message():
         "در این بازی ۷ سؤال از سطح انتخابی شما نمایش داده می‌شود.\n"
         "برای هر سؤال ۱ دقیقه و ۳۰ ثانیه فرصت دارید.\n\n"
         "✅ پاسخ صحیح: +۱۰۰ امتیاز\n"
-        "❌ پاسخ غلط: −۱۵ امتیاز\n"
+        "❌ هر دو پاسخ غلط: −۱۵ امتیاز\n"
         "⏱ بدون پاسخ: ۰ امتیاز\n\n"
         "برای شروع، سطح خود را انتخاب کنید:"
     )
@@ -427,12 +480,19 @@ def process_answer(chat_id, callback_id, option_index):
         )
 
     else:
-        game["score"] -= 15
+        # هر دو پاسخ غلط = ۱۵ امتیاز منفی
+        game["wrong_answers"] += 1
+
+        if game["wrong_answers"] % 2 == 0:
+            game["score"] -= 15
+            penalty_text = "امتیاز این سؤال: −۱۵"
+        else:
+            penalty_text = "امتیاز این سؤال: ۰"
 
         result_text = (
             "❌ <b>پاسخ غلط</b>\n\n"
             f"پاسخ صحیح: {correct_answer}\n"
-            "امتیاز این سؤال: −۱۵\n"
+            f"{penalty_text}\n"
             f"امتیاز فعلی: {game['score']}"
         )
 
@@ -463,16 +523,34 @@ def finish_game(chat_id):
         return
 
     score = game["score"]
-    level = LEVEL_NAMES.get(game["level"], game["level"])
+    level = LEVEL_NAMES.get(
+        game["level"],
+        game["level"]
+    )
 
     if score >= 600:
-        message = "🏆 فوق‌العاده بود! شما واقعاً در این سطح درخشیدید."
+        message = (
+            "🏆 فوق‌العاده بود! "
+            "شما واقعاً در این سطح درخشیدید."
+        )
+
     elif score >= 400:
-        message = "👏 عالی بود! عملکرد بسیار خوبی داشتید."
+        message = (
+            "👏 عالی بود! "
+            "عملکرد بسیار خوبی داشتید."
+        )
+
     elif score >= 200:
-        message = "🌿 خوب بود! با کمی تمرین بهتر هم می‌شوید."
+        message = (
+            "🌿 خوب بود! "
+            "با کمی تمرین بهتر هم می‌شوید."
+        )
+
     else:
-        message = "📚 این پایان راه نیست؛ یک بار دیگر امتحان کنید."
+        message = (
+            "📚 این پایان راه نیست؛ "
+            "یک بار دیگر امتحان کنید."
+        )
 
     text = (
         "🎉 <b>چالش به پایان رسید!</b>\n\n"
@@ -511,7 +589,10 @@ def start_game(chat_id, level):
         )
         return
 
-    selected = random.sample(available, QUESTION_COUNT)
+    selected = random.sample(
+        available,
+        QUESTION_COUNT
+    )
 
     prepared_questions = [
         prepare_question(q)
@@ -523,6 +604,7 @@ def start_game(chat_id, level):
         "questions": prepared_questions,
         "current": 0,
         "score": 0,
+        "wrong_answers": 0,
         "message_id": None,
         "question_started": None,
         "answered": False,
@@ -542,13 +624,24 @@ def start_game(chat_id, level):
 
         if countdown_id:
             time.sleep(0.7)
-            edit_message(chat_id, countdown_id, "۲")
+            edit_message(
+                chat_id,
+                countdown_id,
+                "۲"
+            )
 
             time.sleep(0.7)
-            edit_message(chat_id, countdown_id, "۳")
+            edit_message(
+                chat_id,
+                countdown_id,
+                "۳"
+            )
 
             time.sleep(0.7)
-            delete_message(chat_id, countdown_id)
+            delete_message(
+                chat_id,
+                countdown_id
+            )
 
     send_message(
         chat_id,
@@ -578,7 +671,11 @@ def handle_update(update):
         if not chat_id:
             return
 
-        if text in ["/start", "شروع", "شروع چالش"]:
+        if text in [
+            "/start",
+            "شروع",
+            "شروع چالش"
+        ]:
             send_message(
                 chat_id,
                 start_message(),
@@ -596,8 +693,16 @@ def handle_update(update):
     callback_id = callback.get("id")
     data = callback.get("data", "")
 
-    callback_message = callback.get("message", {})
-    chat = callback_message.get("chat", {})
+    callback_message = callback.get(
+        "message",
+        {}
+    )
+
+    chat = callback_message.get(
+        "chat",
+        {}
+    )
+
     chat_id = chat.get("id")
 
     if not chat_id:
@@ -617,18 +722,30 @@ def handle_update(update):
         return
 
     if data.startswith("level_"):
-        level = data.replace("level_", "", 1)
+        level = data.replace(
+            "level_",
+            "",
+            1
+        )
 
         answer_callback(callback_id)
 
         if level not in LEVEL_NAMES:
             return
 
-        start_game(chat_id, level)
+        start_game(
+            chat_id,
+            level
+        )
+
         return
 
     if data.startswith("answer_"):
-        option_index = data.replace("answer_", "", 1)
+        option_index = data.replace(
+            "answer_",
+            "",
+            1
+        )
 
         process_answer(
             chat_id,
@@ -641,7 +758,9 @@ def handle_update(update):
 def webhook():
     """دریافت Update از سروش‌پلاس."""
     try:
-        update = request.get_json(silent=True)
+        update = request.get_json(
+            silent=True
+        )
 
         if not update:
             return "OK"
@@ -662,8 +781,10 @@ def webhook():
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
-        port=int(os.getenv("PORT", 5000))
-    )
-
-
-
+        port=int(
+            os.getenv(
+                "PORT",
+                5000
+            )
+        )
+            )
