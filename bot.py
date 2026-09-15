@@ -45,7 +45,10 @@ def api_request(method, data=None):
         )
 
         if response.status_code != 200:
-            print(f"API Error {method}: {response.status_code}")
+            print(
+                f"API Error {method}: "
+                f"{response.status_code} - {response.text}"
+            )
             return None
 
         return response.json()
