@@ -38,8 +38,11 @@ game_locks = {}
 def api_request(method, data=None):
     """ارسال درخواست به API سروش‌پلاس."""
     try:
+        url = f"{API_BASE}/{method}"
+        print(f"API URL: {url}")
+
         response = requests.post(
-            f"{API_BASE}/{method}",
+            url,
             json=data or {},
             timeout=20
         )
