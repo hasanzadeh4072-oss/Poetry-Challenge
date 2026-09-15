@@ -384,29 +384,60 @@ def send_question(chat_id):
     message = result.get("result", {})
 
     game["message_id"] = message.get("message_id")
-    game["question_started"] = time.time()
+
+    # ثبت زمان دقیق شروع سؤال
+    game["question_started"] = time.monotonic()
+
+    # شناسه اختصاصی این سؤال برای جلوگیری از
+    # تداخل تایمرهای سؤال‌های قبلی
+    timer_id = object()
+    game["timer_id"] = timer_id
 
     timer = threading.Thread(
         target=question_timeout,
-        args=(chat_id, index),
+        args=(chat_id, index, timer_id),
         daemon=True
     )
 
     timer.start()
 
 
-def question_timeout(chat_id, question_index):
-    """بررسی پایان زمان پاسخ."""
-    time.sleep(QUESTION_TIME)
+def question_timeout(chat_id, question_index, timer_id):
+    """بررسی پایان دقیق زمان پاسخ."""
 
     game = games.get(chat_id)
 
     if not game:
         return
 
-    if game["current"] != question_index:
+    start_time = game.get("question_started")
+
+    if start_time is None:
         return
 
+    # زمان دقیق پایان سؤال
+    deadline = start_time + QUESTION_TIME
+
+    # مدت باقی‌مانده را محاسبه می‌کنیم
+    remaining = deadline - time.monotonic()
+
+    if remaining > 0:
+        time.sleep(remaining)
+
+    game = games.get(chat_id)
+
+    if not game:
+        return
+
+    # اگر سؤال عوض شده، این تایمر دیگر معتبر نیست
+    if game.get("current") != question_index:
+        return
+
+    # اگر تایمر مربوط به سؤال فعلی نیست، کاری نکن
+    if game.get("timer_id") is not timer_id:
+        return
+
+    # اگر کاربر قبلاً پاسخ داده، کاری نکن
     if game.get("answered"):
         return
 
@@ -424,6 +455,7 @@ def question_timeout(chat_id, question_index):
 
     game["current"] += 1
     game["answered"] = False
+    game["timer_id"] = None
 
     time.sleep(1)
 
@@ -470,6 +502,9 @@ def process_answer(chat_id, callback_id, option_index):
 
     game["answered"] = True
 
+    # با پاسخ کاربر، تایمر این سؤال دیگر معتبر نیست
+    game["timer_id"] = None
+
     if selected_answer == correct_answer:
         game["score"] += 100
 
@@ -480,9 +515,10 @@ def process_answer(chat_id, callback_id, option_index):
         )
 
     else:
-        # هر دو پاسخ غلط = ۱۵ امتیاز منفی
+        # شمارش تعداد پاسخ‌های غلط
         game["wrong_answers"] += 1
 
+        # هر دو پاسخ غلط = ۱۵ امتیاز منفی
         if game["wrong_answers"] % 2 == 0:
             game["score"] -= 15
             penalty_text = "امتیاز این سؤال: −۱۵"
@@ -523,6 +559,7 @@ def finish_game(chat_id):
         return
 
     score = game["score"]
+
     level = LEVEL_NAMES.get(
         game["level"],
         game["level"]
@@ -607,6 +644,7 @@ def start_game(chat_id, level):
         "wrong_answers": 0,
         "message_id": None,
         "question_started": None,
+        "timer_id": None,
         "answered": False,
     }
 
@@ -624,6 +662,7 @@ def start_game(chat_id, level):
 
         if countdown_id:
             time.sleep(0.7)
+
             edit_message(
                 chat_id,
                 countdown_id,
@@ -631,6 +670,7 @@ def start_game(chat_id, level):
             )
 
             time.sleep(0.7)
+
             edit_message(
                 chat_id,
                 countdown_id,
@@ -638,6 +678,7 @@ def start_game(chat_id, level):
             )
 
             time.sleep(0.7)
+
             delete_message(
                 chat_id,
                 countdown_id
@@ -787,4 +828,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-            )
+                )
