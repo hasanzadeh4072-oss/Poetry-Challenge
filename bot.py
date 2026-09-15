@@ -59,6 +59,7 @@ def send_message(chat_id, text, reply_markup=None):
     data = {
         "chat_id": chat_id,
         "text": text,
+        "parse_mode": "HTML",
     }
 
     if reply_markup:
@@ -72,6 +73,7 @@ def edit_message(chat_id, message_id, text, reply_markup=None):
         "chat_id": chat_id,
         "message_id": message_id,
         "text": text,
+        "parse_mode": "HTML",
     }
 
     if reply_markup:
@@ -100,6 +102,57 @@ def answer_callback(callback_id):
         )
 
 
+def build_options(question):
+    """
+    ساخت گزینه‌ها برای سؤال.
+
+    اگر فیلد «گزینه‌ها» وجود داشته باشد، همان استفاده می‌شود.
+    در غیر این صورت از «پاسخ صحیح» و «سایر گزینه‌های چالشی»
+    گزینه‌ها ساخته می‌شوند.
+    """
+
+    options = question.get("گزینه‌ها")
+
+    if isinstance(options, list) and len(options) >= 2:
+        return options
+
+    correct_answer = question.get("پاسخ صحیح")
+
+    if not correct_answer:
+        return None
+
+    other_options = question.get("سایر گزینه‌های چالشی", [])
+
+    if isinstance(other_options, list):
+        others = other_options[:]
+
+    elif isinstance(other_options, str):
+        # پشتیبانی از فرمت‌هایی مثل:
+        # "گوش, زبان, صورت"
+        others = [
+            item.strip()
+            for item in other_options.split(",")
+            if item.strip()
+        ]
+
+    else:
+        others = []
+
+    options = [correct_answer] + others
+
+    # حذف موارد تکراری بدون تغییر ترتیب
+    unique_options = []
+
+    for option in options:
+        if option not in unique_options:
+            unique_options.append(option)
+
+    if len(unique_options) < 2:
+        return None
+
+    return unique_options
+
+
 def load_questions():
     """بارگذاری سؤال‌های سه سطح."""
     questions = {}
@@ -126,16 +179,16 @@ def load_questions():
                 if not q.get("پاسخ صحیح"):
                     continue
 
-                options = q.get("گزینه‌ها")
+                options = build_options(q)
 
-                if not isinstance(options, list):
-                    continue
-
-                if len(options) < 2:
+                if not options:
                     continue
 
                 if q["پاسخ صحیح"] not in options:
                     continue
+
+                # گزینه‌ها را برای استفاده مستقیم در بازی اضافه می‌کنیم
+                q["گزینه‌ها"] = options
 
                 valid_questions.append(q)
 
@@ -274,7 +327,6 @@ def send_question(chat_id):
     game["message_id"] = message.get("message_id")
     game["question_started"] = time.time()
 
-    # برای کنترل زمان سؤال
     timer = threading.Thread(
         target=question_timeout,
         args=(chat_id, index),
@@ -293,7 +345,6 @@ def question_timeout(chat_id, question_index):
     if not game:
         return
 
-    # اگر کاربر به سؤال بعدی رفته، این تایمر مربوط به سؤال قبلی است.
     if game["current"] != question_index:
         return
 
@@ -301,7 +352,6 @@ def question_timeout(chat_id, question_index):
         return
 
     game["answered"] = True
-    game["score"] += 0
 
     if game.get("message_id"):
         edit_message(
@@ -365,8 +415,8 @@ def process_answer(chat_id, callback_id, option_index):
         game["score"] += 100
 
         result_text = (
-            f"✅ <b>پاسخ صحیح</b>\n\n"
-            f"امتیاز این سؤال: +۱۰۰\n"
+            "✅ <b>پاسخ صحیح</b>\n\n"
+            "امتیاز این سؤال: +۱۰۰\n"
             f"امتیاز فعلی: {game['score']}"
         )
 
@@ -374,9 +424,9 @@ def process_answer(chat_id, callback_id, option_index):
         game["score"] -= 15
 
         result_text = (
-            f"❌ <b>پاسخ غلط</b>\n\n"
+            "❌ <b>پاسخ غلط</b>\n\n"
             f"پاسخ صحیح: {correct_answer}\n"
-            f"امتیاز این سؤال: −۱۵\n"
+            "امتیاز این سؤال: −۱۵\n"
             f"امتیاز فعلی: {game['score']}"
         )
 
@@ -608,3 +658,6 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(os.getenv("PORT", 5000))
     )
+
+
+
