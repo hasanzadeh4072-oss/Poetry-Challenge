@@ -679,6 +679,17 @@ def process_answer(
             answer_callback_async(
                 callback_id
             )
+
+            send_message(
+                chat_id,
+                (
+                    "⚠️ <b>چالش قبلی به دلیل راه‌اندازی مجدد بات متوقف شده است.</b>\n\n"
+                    "لطفاً دکمه «⛔ توقف چالش» را بزنید و سپس یک چالش جدید شروع کنید."
+                ),
+                stop_keyboard(),
+                context="restart_recovery"
+            )
+
             return
 
         current = game["current"]
@@ -1143,7 +1154,10 @@ def handle_update(update):
             else:
                 send_message(
                     chat_id,
-                    "ℹ️ در حال حاضر چالش فعالی ندارید.",
+                    (
+                        "ℹ️ در حال حاضر چالش فعالی ندارید.\n\n"
+                        "🎮 برای شروع، یک چالش جدید را آغاز کنید."
+                    ),
                     main_keyboard(),
                     context="stop_no_game"
                 )
@@ -1353,4 +1367,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-        )
+    )
