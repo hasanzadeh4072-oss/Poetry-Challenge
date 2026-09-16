@@ -7,7 +7,6 @@ import time
 import requests
 from flask import Flask, request
 
-
 app = Flask(__name__)
 
 TOKEN = os.getenv("SOROUSH_TOKEN")
@@ -28,47 +27,28 @@ LEVEL_NAMES = {
     "ostad": "استادی",
 }
 
-
-# ==================================================
-# وضعیت بازی کاربران
-# ==================================================
-
 games = {}
-
 game_locks = {}
 game_locks_guard = threading.Lock()
 
 
 def get_game_lock(chat_id):
-    """دریافت قفل اختصاصی هر کاربر."""
-
     with game_locks_guard:
         if chat_id not in game_locks:
             game_locks[chat_id] = threading.Lock()
-
         return game_locks[chat_id]
 
 
-# ==================================================
-# API
-# ==================================================
-
 def api_request(method, data=None, context=""):
-
     start_time = time.monotonic()
 
     try:
-
         url = f"{API_BASE}/{method}"
 
         if context:
-            print(
-                f"API START: {method} | {context}"
-            )
+            print(f"API START: {method} | {context}")
         else:
-            print(
-                f"API START: {method}"
-            )
+            print(f"API START: {method}")
 
         response = requests.post(
             url,
@@ -82,52 +62,35 @@ def api_request(method, data=None, context=""):
             f"API END: {method} "
             f"status={response.status_code} "
             f"time={elapsed:.2f}s"
-            + (
-                f" | {context}"
-                if context
-                else ""
-            )
+            + (f" | {context}" if context else "")
         )
 
         if response.status_code != 200:
-
             print(
                 f"API Error {method}: "
                 f"{response.status_code} - {response.text}"
             )
-
             return None
 
         return response.json()
 
     except Exception as e:
-
         elapsed = time.monotonic() - start_time
 
         print(
             f"API Exception {method}: "
             f"time={elapsed:.2f}s - {e}"
-            + (
-                f" | {context}"
-                if context
-                else ""
-            )
+            + (f" | {context}" if context else "")
         )
 
         return None
 
 
-def send_message(
-    chat_id,
-    text,
-    reply_markup=None,
-    context=""
-):
-
+def send_message(chat_id, text, reply_markup=None, context=""):
     data = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "HTML",
+        "parse_mode": "HTML"
     }
 
     if reply_markup is not None:
@@ -147,12 +110,11 @@ def edit_message(
     reply_markup=None,
     context=""
 ):
-
     data = {
         "chat_id": chat_id,
         "message_id": message_id,
         "text": text,
-        "parse_mode": "HTML",
+        "parse_mode": "HTML"
     }
 
     if reply_markup is not None:
@@ -165,24 +127,18 @@ def edit_message(
     )
 
 
-def delete_message(
-    chat_id,
-    message_id,
-    context=""
-):
-
+def delete_message(chat_id, message_id, context=""):
     return api_request(
         "deleteMessage",
         {
             "chat_id": chat_id,
-            "message_id": message_id,
+            "message_id": message_id
         },
         context
     )
 
 
 def answer_callback(callback_id):
-
     if not callback_id:
         return
 
@@ -196,7 +152,6 @@ def answer_callback(callback_id):
 
 
 def answer_callback_async(callback_id):
-
     if not callback_id:
         return
 
@@ -207,12 +162,7 @@ def answer_callback_async(callback_id):
     ).start()
 
 
-# ==================================================
-# ساخت گزینه‌های سؤال
-# ==================================================
-
 def build_options(question):
-
     question_type = str(
         question.get("نوع سؤال", "")
     ).strip()
@@ -224,20 +174,14 @@ def build_options(question):
         "درست یا غلط",
         "صحیح-غلط",
     ]:
-
-        return [
-            "صحیح",
-            "غلط"
-        ]
+        return ["صحیح", "غلط"]
 
     options = question.get("گزینه‌ها")
 
     if isinstance(options, list):
-
         clean_options = []
 
         for option in options:
-
             if option is None:
                 continue
 
@@ -246,11 +190,7 @@ def build_options(question):
             if not option:
                 continue
 
-            if option in [
-                "-",
-                "—",
-                "–"
-            ]:
+            if option in ["-", "—", "–"]:
                 continue
 
             if option not in clean_options:
@@ -259,16 +199,12 @@ def build_options(question):
         if len(clean_options) >= 2:
             return clean_options
 
-    correct_answer = question.get(
-        "پاسخ صحیح"
-    )
+    correct_answer = question.get("پاسخ صحیح")
 
     if not correct_answer:
         return None
 
-    correct_answer = str(
-        correct_answer
-    ).strip()
+    correct_answer = str(correct_answer).strip()
 
     if not correct_answer:
         return None
@@ -279,11 +215,9 @@ def build_options(question):
     )
 
     if isinstance(other_options, list):
-
         others = other_options[:]
 
     elif isinstance(other_options, str):
-
         others = [
             item.strip()
             for item in other_options.split(",")
@@ -291,17 +225,13 @@ def build_options(question):
         ]
 
     else:
-
         others = []
 
-    options = [
-        correct_answer
-    ] + others
+    options = [correct_answer] + others
 
     unique_options = []
 
     for option in options:
-
         if option is None:
             continue
 
@@ -310,11 +240,7 @@ def build_options(question):
         if not option:
             continue
 
-        if option in [
-            "-",
-            "—",
-            "–"
-        ]:
+        if option in ["-", "—", "–"]:
             continue
 
         if option not in unique_options:
@@ -326,40 +252,28 @@ def build_options(question):
     return unique_options
 
 
-# ==================================================
-# بارگذاری سؤال‌ها
-# ==================================================
-
 def load_questions():
-
     questions = {}
 
     for level, filename in LEVEL_FILES.items():
-
         try:
-
             with open(
                 filename,
                 "r",
                 encoding="utf-8"
             ) as f:
-
                 data = json.load(f)
 
             if not isinstance(data, list):
-
                 print(
-                    f"{filename}: "
-                    "JSON باید یک لیست باشد."
+                    f"{filename}: JSON باید یک لیست باشد."
                 )
-
                 questions[level] = []
                 continue
 
             valid_questions = []
 
             for q in data:
-
                 if not isinstance(q, dict):
                     continue
 
@@ -378,7 +292,6 @@ def load_questions():
                     continue
 
                 q["گزینه‌ها"] = options
-
                 valid_questions.append(q)
 
             questions[level] = valid_questions
@@ -389,19 +302,15 @@ def load_questions():
             )
 
         except FileNotFoundError:
-
             print(
                 f"فایل پیدا نشد: {filename}"
             )
-
             questions[level] = []
 
         except Exception as e:
-
             print(
                 f"خطا در خواندن {filename}: {e}"
             )
-
             questions[level] = []
 
     return questions
@@ -410,12 +319,7 @@ def load_questions():
 QUESTIONS = load_questions()
 
 
-# ==================================================
-# Reply Keyboard
-# ==================================================
-
 def main_keyboard():
-
     return {
         "keyboard": [
             [
@@ -430,7 +334,6 @@ def main_keyboard():
 
 
 def level_keyboard():
-
     return {
         "keyboard": [
             [
@@ -451,7 +354,6 @@ def level_keyboard():
 
 
 def stop_keyboard():
-
     return {
         "keyboard": [
             [
@@ -465,36 +367,27 @@ def stop_keyboard():
     }
 
 
-# ==================================================
-# Inline Keyboard پاسخ سؤال
-# ==================================================
-
 def answer_keyboard(options, question_token):
-
     rows = []
 
     for index, option in enumerate(options):
-
-        rows.append([
-            {
-                "text": str(option),
-                "callback_data": (
-                    f"answer_{question_token}_{index}"
-                )
-            }
-        ])
+        rows.append(
+            [
+                {
+                    "text": str(option),
+                    "callback_data": (
+                        f"answer_{question_token}_{index}"
+                    )
+                }
+            ]
+        )
 
     return {
         "inline_keyboard": rows
     }
 
 
-# ==================================================
-# پیام خوش‌آمدگویی
-# ==================================================
-
 def start_message():
-
     return (
         "📚 <b>چالش شعرانه</b>\n\n"
         "در این بازی ۷ سؤال از سطح انتخابی شما نمایش داده می‌شود.\n"
@@ -506,34 +399,20 @@ def start_message():
     )
 
 
-# ==================================================
-# آماده‌سازی سؤال
-# ==================================================
-
 def prepare_question(question):
-
-    options = list(
-        question["گزینه‌ها"]
-    )
-
+    options = list(question["گزینه‌ها"])
     random.shuffle(options)
 
     return {
         "question": question,
-        "options": options,
+        "options": options
     }
 
 
-# ==================================================
-# ارسال سؤال
-# ==================================================
-
 def send_question(chat_id):
-
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.get(chat_id)
 
         if not game:
@@ -542,19 +421,14 @@ def send_question(chat_id):
         index = game["current"]
 
         if index >= QUESTION_COUNT:
-
             should_finish = True
 
         else:
-
             should_finish = False
 
             prepared = game["questions"][index]
-
             question = prepared["question"]
             options = prepared["options"]
-
-            # شناسه اختصاصی همین سؤال
             question_token = game["question_token"]
 
             text = (
@@ -564,9 +438,7 @@ def send_question(chat_id):
             )
 
     if should_finish:
-
         finish_game(chat_id)
-
         return
 
     result = send_message(
@@ -582,7 +454,8 @@ def send_question(chat_id):
     if not result:
         print(
             f"QUESTION SEND FAILED: "
-            f"chat={chat_id} question={index + 1}"
+            f"chat={chat_id} "
+            f"question={index + 1}"
         )
         return
 
@@ -598,14 +471,14 @@ def send_question(chat_id):
     if not message_id:
         print(
             f"QUESTION MESSAGE ID MISSING: "
-            f"chat={chat_id} question={index + 1}"
+            f"chat={chat_id} "
+            f"question={index + 1}"
         )
         return
 
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.get(chat_id)
 
         if not game:
@@ -618,18 +491,17 @@ def send_question(chat_id):
             return
 
         game["message_id"] = message_id
-
-        game["question_started"] = (
-            time.monotonic()
-        )
-
+        game["question_started"] = time.monotonic()
         game["question_deadline"] = (
             game["question_started"]
             + QUESTION_TIME
         )
 
-        timer_id = object()
+        # مهم:
+        # هر سؤال جدید باید دوباره قابل پاسخ باشد.
+        game["answered"] = False
 
+        timer_id = object()
         game["timer_id"] = timer_id
 
     print(
@@ -651,19 +523,10 @@ def send_question(chat_id):
     ).start()
 
 
-# ==================================================
-# ادامه بازی
-# ==================================================
-
-def continue_game(
-    chat_id,
-    expected_current
-):
-
+def continue_game(chat_id, expected_current):
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.get(chat_id)
 
         if not game:
@@ -673,27 +536,18 @@ def continue_game(
             return
 
         if expected_current >= QUESTION_COUNT:
-
             should_finish = True
-
         else:
-
             should_finish = False
 
     if should_finish:
-
         finish_game(chat_id)
 
     else:
-
         send_question(chat_id)
 
 
-def schedule_next_question(
-    chat_id,
-    expected_current
-):
-
+def schedule_next_question(chat_id, expected_current):
     timer = threading.Timer(
         1.0,
         continue_game,
@@ -707,21 +561,15 @@ def schedule_next_question(
     timer.start()
 
 
-# ==================================================
-# تایمر سؤال
-# ==================================================
-
 def question_timeout(
     chat_id,
     question_index,
     question_token,
     timer_id
 ):
-
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.get(chat_id)
 
         if not game:
@@ -745,10 +593,7 @@ def question_timeout(
             start_time + QUESTION_TIME
         )
 
-    remaining = (
-        deadline
-        - time.monotonic()
-    )
+    remaining = deadline - time.monotonic()
 
     if remaining > 0:
         time.sleep(remaining)
@@ -756,7 +601,6 @@ def question_timeout(
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.get(chat_id)
 
         if not game:
@@ -793,16 +637,12 @@ def question_timeout(
         f"token={question_token}"
     )
 
-    # مهم:
-    # سؤال بعدی را قبل از editMessageText زمان‌بندی می‌کنیم.
-    # بنابراین اگر API ادیت پیام گیر کرد، بازی متوقف نمی‌شود.
     schedule_next_question(
         chat_id,
         expected_current
     )
 
     if message_id:
-
         edit_message(
             chat_id,
             message_id,
@@ -811,13 +651,12 @@ def question_timeout(
                 f"{question_index + 1} تمام شد.</b>\n\n"
                 "امتیاز این سؤال: ۰"
             ),
-            context=f"timeout_question_{question_index + 1}"
+            context=(
+                f"timeout_question_"
+                f"{question_index + 1}"
+            )
         )
 
-
-# ==================================================
-# پردازش پاسخ
-# ==================================================
 
 def process_answer(
     chat_id,
@@ -825,50 +664,41 @@ def process_answer(
     question_token,
     option_index
 ):
-
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.get(chat_id)
 
         if not game:
-
             print(
                 f"ANSWER IGNORED: "
-                f"chat={chat_id} reason=no_game"
+                f"chat={chat_id} "
+                f"reason=no_game"
             )
 
             answer_callback_async(
                 callback_id
             )
-
             return
 
         current = game["current"]
 
-        # ------------------------------------------
-        # جلوگیری از پاسخ سؤال قدیمی
-        # ------------------------------------------
-
         if game.get("question_token") != question_token:
-
             print(
                 f"ANSWER IGNORED: "
                 f"chat={chat_id} "
                 f"reason=stale_question "
                 f"received_token={question_token} "
-                f"current_token={game.get('question_token')}"
+                f"current_token="
+                f"{game.get('question_token')}"
             )
 
             answer_callback_async(
                 callback_id
             )
-
             return
 
         if game.get("answered"):
-
             print(
                 f"ANSWER IGNORED: "
                 f"chat={chat_id} "
@@ -879,42 +709,22 @@ def process_answer(
             answer_callback_async(
                 callback_id
             )
-
             return
 
         if current >= QUESTION_COUNT:
-
             answer_callback_async(
                 callback_id
             )
-
             return
-
-        # ------------------------------------------
-        # بررسی message_id
-        # ------------------------------------------
-
-        callback_message_id = (
-            None
-        )
-
-        # message_id از callback در handle_update
-        # در صورت نیاز از آنجا منتقل می‌شود.
-        # در اینجا فقط token ملاک اصلی است.
 
         deadline = game.get(
             "question_deadline"
         )
 
-        # ------------------------------------------
-        # پاسخ بعد از پایان زمان
-        # ------------------------------------------
-
         if (
             deadline is not None
             and time.monotonic() >= deadline
         ):
-
             game["answered"] = True
             game["timer_id"] = None
 
@@ -937,16 +747,13 @@ def process_answer(
             )
 
         else:
-
             timeout_case = False
 
             prepared = game["questions"][current]
-
             question = prepared["question"]
             options = prepared["options"]
 
             try:
-
                 option_index = int(
                     option_index
                 )
@@ -955,22 +762,18 @@ def process_answer(
                 ValueError,
                 TypeError
             ):
-
                 answer_callback_async(
                     callback_id
                 )
-
                 return
 
             if (
                 option_index < 0
                 or option_index >= len(options)
             ):
-
                 answer_callback_async(
                     callback_id
                 )
-
                 return
 
             selected_answer = options[
@@ -988,47 +791,37 @@ def process_answer(
                 "message_id"
             )
 
-            # --------------------------------------
-            # پاسخ صحیح
-            # --------------------------------------
-
             if selected_answer == correct_answer:
-
                 game["score"] += 100
 
                 result_text = (
                     "✅ <b>پاسخ صحیح</b>\n\n"
                     "امتیاز این سؤال: +۱۰۰\n"
-                    f"امتیاز فعلی: {game['score']}"
+                    f"امتیاز فعلی: "
+                    f"{game['score']}"
                 )
 
-            # --------------------------------------
-            # پاسخ غلط
-            # --------------------------------------
-
             else:
-
                 game["wrong_answers"] += 1
 
                 if game["wrong_answers"] % 2 == 0:
-
                     game["score"] -= 15
-
                     penalty_text = (
                         "امتیاز این سؤال: −۱۵"
                     )
 
                 else:
-
                     penalty_text = (
                         "امتیاز این سؤال: ۰"
                     )
 
                 result_text = (
                     "❌ <b>پاسخ غلط</b>\n\n"
-                    f"پاسخ صحیح: {correct_answer}\n"
+                    f"پاسخ صحیح: "
+                    f"{correct_answer}\n"
                     f"{penalty_text}\n"
-                    f"امتیاز فعلی: {game['score']}"
+                    f"امتیاز فعلی: "
+                    f"{game['score']}"
                 )
 
             game["current"] += 1
@@ -1044,32 +837,17 @@ def process_answer(
                 f"selected={selected_answer}"
             )
 
-    # ----------------------------------------------
-    # Callback را سریع پاسخ می‌دهیم
-    # ----------------------------------------------
-
     answer_callback_async(
         callback_id
     )
-
-    # ----------------------------------------------
-    # سؤال بعدی را مستقل از editMessageText
-    # زمان‌بندی می‌کنیم.
-    # ----------------------------------------------
 
     schedule_next_question(
         chat_id,
         expected_current
     )
 
-    # ----------------------------------------------
-    # پاسخ دیرهنگام
-    # ----------------------------------------------
-
     if timeout_case:
-
         if message_id:
-
             edit_message(
                 chat_id,
                 message_id,
@@ -1078,35 +856,30 @@ def process_answer(
                     f"{current + 1} تمام شد.</b>\n\n"
                     "امتیاز این سؤال: ۰"
                 ),
-                context=f"late_answer_question_{current + 1}"
+                context=(
+                    f"late_answer_question_"
+                    f"{current + 1}"
+                )
             )
 
         return
 
-    # ----------------------------------------------
-    # پاسخ عادی
-    # ----------------------------------------------
-
     if message_id:
-
         edit_message(
             chat_id,
             message_id,
             result_text,
-            context=f"answer_question_{current + 1}"
+            context=(
+                f"answer_question_"
+                f"{current + 1}"
+            )
         )
 
 
-# ==================================================
-# پایان بازی
-# ==================================================
-
 def finish_game(chat_id):
-
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.pop(
             chat_id,
             None
@@ -1123,28 +896,24 @@ def finish_game(chat_id):
     )
 
     if score >= 600:
-
         message = (
             "🏆 فوق‌العاده بود! "
             "شما واقعاً در این سطح درخشیدید."
         )
 
     elif score >= 400:
-
         message = (
             "👏 عالی بود! "
             "عملکرد بسیار خوبی داشتید."
         )
 
     elif score >= 200:
-
         message = (
             "🌿 خوب بود! "
             "با کمی تمرین بهتر هم می‌شوید."
         )
 
     else:
-
         message = (
             "📚 این پایان راه نیست؛ "
             "یک بار دیگر امتحان کنید."
@@ -1166,30 +935,22 @@ def finish_game(chat_id):
     )
 
 
-# ==================================================
-# توقف چالش
-# ==================================================
-
 def stop_game(chat_id):
-
     lock = get_game_lock(chat_id)
 
     with lock:
-
         game = games.pop(
             chat_id,
             None
         )
 
     if not game:
-
         send_message(
             chat_id,
             "ℹ️ در حال حاضر چالش فعالی ندارید.",
             main_keyboard(),
             context="stop_no_game"
         )
-
         return
 
     send_message(
@@ -1204,18 +965,11 @@ def stop_game(chat_id):
     )
 
 
-# ==================================================
-# شروع واقعی بازی
-# ==================================================
-
 def start_game(chat_id, level):
-
     lock = get_game_lock(chat_id)
 
     with lock:
-
         if chat_id in games:
-
             send_message(
                 chat_id,
                 (
@@ -1226,24 +980,20 @@ def start_game(chat_id, level):
                 stop_keyboard(),
                 context="start_existing_game"
             )
-
             return
 
         if level not in QUESTIONS:
-
             send_message(
                 chat_id,
                 "متأسفانه سؤال‌های این سطح در دسترس نیست.",
                 main_keyboard(),
                 context="level_unavailable"
             )
-
             return
 
         available = QUESTIONS[level]
 
         if len(available) < QUESTION_COUNT:
-
             send_message(
                 chat_id,
                 (
@@ -1253,7 +1003,6 @@ def start_game(chat_id, level):
                 main_keyboard(),
                 context="not_enough_questions"
             )
-
             return
 
         selected = random.sample(
@@ -1277,8 +1026,6 @@ def start_game(chat_id, level):
             "question_deadline": None,
             "timer_id": None,
             "answered": False,
-
-            # شناسه اختصاصی سؤال
             "question_token": 1,
         }
 
@@ -1289,7 +1036,6 @@ def start_game(chat_id, level):
     )
 
     if countdown_message:
-
         countdown_id = (
             countdown_message
             .get("result", {})
@@ -1297,17 +1043,14 @@ def start_game(chat_id, level):
         )
 
         if countdown_id:
-
             time.sleep(0.7)
 
             if chat_id not in games:
-
                 delete_message(
                     chat_id,
                     countdown_id,
                     context="delete_countdown"
                 )
-
                 return
 
             edit_message(
@@ -1320,13 +1063,11 @@ def start_game(chat_id, level):
             time.sleep(0.7)
 
             if chat_id not in games:
-
                 delete_message(
                     chat_id,
                     countdown_id,
                     context="delete_countdown"
                 )
-
                 return
 
             edit_message(
@@ -1339,13 +1080,11 @@ def start_game(chat_id, level):
             time.sleep(0.7)
 
             if chat_id not in games:
-
                 delete_message(
                     chat_id,
                     countdown_id,
                     context="delete_countdown"
                 )
-
                 return
 
             delete_message(
@@ -1360,7 +1099,8 @@ def start_game(chat_id, level):
     send_message(
         chat_id,
         (
-            f"🎮 <b>چالش {LEVEL_NAMES[level]}</b>\n\n"
+            f"🎮 <b>چالش "
+            f"{LEVEL_NAMES[level]}</b>\n\n"
             "شروع شد!"
         ),
         stop_keyboard(),
@@ -1375,22 +1115,18 @@ def start_game(chat_id, level):
     send_question(chat_id)
 
 
-# ==================================================
-# پردازش Update
-# ==================================================
-
 def handle_update(update):
-
     message = update.get("message")
 
     if message:
-
         chat = message.get(
             "chat",
             {}
         )
 
-        chat_id = chat.get("id")
+        chat_id = chat.get(
+            "id"
+        )
 
         text = message.get(
             "text",
@@ -1400,41 +1136,22 @@ def handle_update(update):
         if not chat_id:
             return
 
-        # ------------------------------------------
-        # توقف
-        # ------------------------------------------
-
         if text == "⛔ توقف چالش":
-
             if chat_id in games:
-
                 stop_game(chat_id)
 
             else:
-
                 send_message(
                     chat_id,
-                    (
-                        "ℹ️ در حال حاضر "
-                        "چالش فعالی ندارید."
-                    ),
+                    "ℹ️ در حال حاضر چالش فعالی ندارید.",
                     main_keyboard(),
                     context="stop_no_game"
                 )
 
             return
 
-        # ------------------------------------------
-        # شروع /start
-        # ------------------------------------------
-
-        if text in [
-            "/start",
-            "شروع"
-        ]:
-
+        if text in ["/start", "شروع"]:
             if chat_id in games:
-
                 send_message(
                     chat_id,
                     (
@@ -1446,7 +1163,6 @@ def handle_update(update):
                     stop_keyboard(),
                     context="start_during_game"
                 )
-
                 return
 
             send_message(
@@ -1458,14 +1174,8 @@ def handle_update(update):
 
             return
 
-        # ------------------------------------------
-        # شروع چالش
-        # ------------------------------------------
-
         if text == "شروع چالش":
-
             if chat_id in games:
-
                 send_message(
                     chat_id,
                     (
@@ -1477,7 +1187,6 @@ def handle_update(update):
                     stop_keyboard(),
                     context="start_button_during_game"
                 )
-
                 return
 
             send_message(
@@ -1492,10 +1201,6 @@ def handle_update(update):
 
             return
 
-        # ------------------------------------------
-        # انتخاب سطح
-        # ------------------------------------------
-
         level_map = {
             "آشنایی": "ashenaei",
             "دانایی": "danaei",
@@ -1503,9 +1208,7 @@ def handle_update(update):
         }
 
         if text in level_map:
-
             if chat_id in games:
-
                 send_message(
                     chat_id,
                     (
@@ -1516,7 +1219,6 @@ def handle_update(update):
                     stop_keyboard(),
                     context="level_during_game"
                 )
-
                 return
 
             start_game(
@@ -1527,10 +1229,6 @@ def handle_update(update):
             return
 
         return
-
-    # ----------------------------------------------
-    # Callback Query
-    # ----------------------------------------------
 
     callback = update.get(
         "callback_query"
@@ -1558,25 +1256,20 @@ def handle_update(update):
         {}
     )
 
-    chat_id = chat.get("id")
+    chat_id = chat.get(
+        "id"
+    )
 
     if not chat_id:
-
         answer_callback_async(
             callback_id
         )
-
         return
 
     if data.startswith("answer_"):
-
         parts = data.split("_")
 
-        # فرمت جدید:
-        # answer_<question_token>_<option_index>
-
         if len(parts) != 3:
-
             print(
                 f"INVALID CALLBACK DATA: {data}"
             )
@@ -1584,11 +1277,9 @@ def handle_update(update):
             answer_callback_async(
                 callback_id
             )
-
             return
 
         try:
-
             question_token = int(
                 parts[1]
             )
@@ -1601,7 +1292,6 @@ def handle_update(update):
             ValueError,
             TypeError
         ):
-
             print(
                 f"INVALID CALLBACK VALUES: {data}"
             )
@@ -1609,7 +1299,6 @@ def handle_update(update):
             answer_callback_async(
                 callback_id
             )
-
             return
 
         process_answer(
@@ -1626,18 +1315,12 @@ def handle_update(update):
     )
 
 
-# ==================================================
-# Webhook
-# ==================================================
-
 @app.route(
     "/webhook",
     methods=["POST"]
 )
 def webhook():
-
     try:
-
         update = request.get_json(
             silent=True
         )
@@ -1654,7 +1337,6 @@ def webhook():
         return "OK"
 
     except Exception as e:
-
         print(
             f"Webhook Error: {e}"
         )
@@ -1662,12 +1344,7 @@ def webhook():
         return "OK"
 
 
-# ==================================================
-# اجرای برنامه
-# ==================================================
-
 if __name__ == "__main__":
-
     app.run(
         host="0.0.0.0",
         port=int(
