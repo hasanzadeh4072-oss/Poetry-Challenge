@@ -332,6 +332,17 @@ def main_keyboard():
                 {
                     "text": "شروع چالش"
                 }
+            ],
+            [
+                {
+                    "text": "💬 ارتباط با مدیر"
+                },
+                {
+                    "text": "🌿 درباره ما"
+                },
+                {
+                    "text": "🤖 سایر بات‌ها"
+                }
             ]
         ],
         "resize_keyboard": True,
@@ -402,6 +413,52 @@ def start_message():
         "❌ هر دو پاسخ غلط: −۱۵ امتیاز\n"
         "⏱ بدون پاسخ: ۰ امتیاز\n\n"
         "برای شروع، دکمه «شروع چالش» را بزنید."
+    )
+
+
+def about_message():
+    return (
+        "🌿 <b>درباره ما</b>\n\n"
+        "از سال ۱۳۹۵ با کانال «شعرکده» در پیام‌رسان سروش پلاس "
+        "همراه شما هستیم.\n\n"
+        "در «شعرکده» بخش‌های متنوعی از جمله:\n"
+        "📜 شعر\n"
+        "📖 برگی از کتاب\n"
+        "🎬 دیالوگ ماندگار\n"
+        "💬 بگو مگو\n"
+        "🪶 ضرب‌المثل\n"
+        "🎵 موزیک‌گردی\n"
+        "🇮🇷 ایران زیبا\n"
+        "را با شما به اشتراک می‌گذاریم.\n\n"
+        "خوشحال می‌شویم پذیرای شما در کانال شعرکده باشیم. 🌱\n\n"
+        '🔗 <a href="https://splus.ir/life_m23">لینک کانال شعرکده</a>'
+    )
+
+
+def manager_message():
+    return (
+        "💬 <b>ارتباط با مدیر</b>\n\n"
+        "اگر پیشنهاد، انتقاد یا پیامی برای مدیر بات دارید، "
+        "می‌توانید از طریق پیام ناشناس شعرکده با ما در ارتباط باشید.\n\n"
+        '🔗 <a href="http://splus.ir/PayamNashenasBot">'
+        "پیام ناشناس شعرکده"
+        "</a>"
+    )
+
+
+def other_bots_message():
+    return (
+        "🤖 <b>سایر بات‌ها</b>\n\n"
+        "📅 تاریخ ایجاد کانال: ۱۳۹۵\n\n"
+        '🎨 <a href="http://splus.ir/PoetryCardBot">'
+        "بات کارت شعر"
+        "</a>\n"
+        '💬 <a href="http://splus.ir/PayamNashenasBot">'
+        "بات پیام ناشناس"
+        "</a>\n"
+        '🌿 <a href="http://splus.ir/HafezFalBot">'
+        "بات فال حافظ"
+        "</a>"
     )
 
 
@@ -668,8 +725,6 @@ def process_answer(
     question_token,
     option_index
 ):
-    # پاسخ به Callback را بلافاصله انجام می‌دهیم
-    # تا دکمه برای کاربر معطل نماند.
     answer_callback_async(callback_id)
 
     lock = get_game_lock(chat_id)
@@ -1134,6 +1189,42 @@ def handle_update(update):
                     context="stop_no_game"
                 )
 
+            return
+
+        if text in [
+            "💬 ارتباط با مدیر",
+            "ارتباط با مدیر"
+        ]:
+            send_message(
+                chat_id,
+                manager_message(),
+                main_keyboard(),
+                context="manager"
+            )
+            return
+
+        if text in [
+            "🌿 درباره ما",
+            "درباره ما"
+        ]:
+            send_message(
+                chat_id,
+                about_message(),
+                main_keyboard(),
+                context="about"
+            )
+            return
+
+        if text in [
+            "🤖 سایر بات‌ها",
+            "سایر بات‌ها"
+        ]:
+            send_message(
+                chat_id,
+                other_bots_message(),
+                main_keyboard(),
+                context="other_bots"
+            )
             return
 
         if text in ["/start", "شروع"]:
