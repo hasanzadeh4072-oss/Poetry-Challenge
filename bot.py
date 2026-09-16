@@ -35,16 +35,35 @@ games = {}
 game_locks = {}
 
 
+def get_game_lock(chat_id):
+    """دریافت قفل اختصاصی هر کاربر."""
+    if chat_id not in game_locks:
+        game_locks[chat_id] = threading.Lock()
+
+    return game_locks[chat_id]
+
+
 def api_request(method, data=None):
     """ارسال درخواست به API سروش‌پلاس."""
+    start_time = time.monotonic()
+
     try:
         url = f"{API_BASE}/{method}"
-        print(f"API URL: {url}")
+
+        print(f"API START: {method}")
 
         response = requests.post(
             url,
             json=data or {},
             timeout=20
+        )
+
+        elapsed = time.monotonic() - start_time
+
+        print(
+            f"API END: {method} "
+            f"status={response.status_code} "
+            f"time={elapsed:.2f}s"
         )
 
         if response.status_code != 200:
@@ -57,7 +76,13 @@ def api_request(method, data=None):
         return response.json()
 
     except Exception as e:
-        print(f"API Exception {method}: {e}")
+        elapsed = time.monotonic() - start_time
+
+        print(
+            f"API Exception {method}: "
+            f"time={elapsed:.2f}s - {e}"
+        )
+
         return None
 
 
@@ -106,6 +131,18 @@ def answer_callback(callback_id):
                 "callback_query_id": callback_id
             }
         )
+
+
+def answer_callback_async(callback_id):
+    """پاسخ به Callback بدون متوقف کردن روند بازی."""
+    if not callback_id:
+        return
+
+    threading.Thread(
+        target=answer_callback,
+        args=(callback_id,),
+        daemon=True
+    ).start()
 
 
 def build_options(question):
@@ -273,15 +310,32 @@ QUESTIONS = load_questions()
 
 
 def main_keyboard():
+    """صفحه‌کلید اصلی خارج از کادر پیام."""
     return {
-        "inline_keyboard": [
+        "keyboard": [
             [
                 {
-                    "text": "شروع چالش",
-                    "callback_data": "start_challenge"
+                    "text": "شروع چالش"
                 }
             ]
-        ]
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False
+    }
+
+
+def stop_keyboard():
+    """صفحه‌کلید توقف چالش خارج از کادر پیام."""
+    return {
+        "keyboard": [
+            [
+                {
+                    "text": "⛔ توقف چالش"
+                }
+            ]
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False
     }
 
 
@@ -388,6 +442,11 @@ def send_question(chat_id):
     # ثبت زمان دقیق شروع سؤال
     game["question_started"] = time.monotonic()
 
+    # ثبت زمان دقیق پایان سؤال
+    game["question_deadline"] = (
+        game["question_started"] + QUESTION_TIME
+    )
+
     # شناسه اختصاصی این سؤال برای جلوگیری از
     # تداخل تایمرهای سؤال‌های قبلی
     timer_id = object()
@@ -415,10 +474,11 @@ def question_timeout(chat_id, question_index, timer_id):
     if start_time is None:
         return
 
-    # زمان دقیق پایان سؤال
-    deadline = start_time + QUESTION_TIME
+    deadline = game.get(
+        "question_deadline",
+        start_time + QUESTION_TIME
+    )
 
-    # مدت باقی‌مانده را محاسبه می‌کنیم
     remaining = deadline - time.monotonic()
 
     if remaining > 0:
@@ -469,17 +529,48 @@ def process_answer(chat_id, callback_id, option_index):
     game = games.get(chat_id)
 
     if not game:
-        answer_callback(callback_id)
+        answer_callback_async(callback_id)
         return
 
     if game.get("answered"):
-        answer_callback(callback_id)
+        answer_callback_async(callback_id)
         return
 
     current = game["current"]
 
     if current >= QUESTION_COUNT:
-        answer_callback(callback_id)
+        answer_callback_async(callback_id)
+        return
+
+    # بررسی دقیق پایان زمان قبل از قبول پاسخ
+    deadline = game.get("question_deadline")
+
+    if deadline is not None and time.monotonic() >= deadline:
+        game["answered"] = True
+        game["timer_id"] = None
+
+        answer_callback_async(callback_id)
+
+        if game.get("message_id"):
+            edit_message(
+                chat_id,
+                game["message_id"],
+                (
+                    f"⏱ <b>زمان سؤال {current + 1} تمام شد.</b>\n\n"
+                    "امتیاز این سؤال: ۰"
+                )
+            )
+
+        game["current"] += 1
+        game["answered"] = False
+
+        time.sleep(1)
+
+        if game["current"] >= QUESTION_COUNT:
+            finish_game(chat_id)
+        else:
+            send_question(chat_id)
+
         return
 
     prepared = game["questions"][current]
@@ -490,11 +581,11 @@ def process_answer(chat_id, callback_id, option_index):
     try:
         option_index = int(option_index)
     except (ValueError, TypeError):
-        answer_callback(callback_id)
+        answer_callback_async(callback_id)
         return
 
     if option_index < 0 or option_index >= len(options):
-        answer_callback(callback_id)
+        answer_callback_async(callback_id)
         return
 
     selected_answer = options[option_index]
@@ -532,7 +623,8 @@ def process_answer(chat_id, callback_id, option_index):
             f"امتیاز فعلی: {game['score']}"
         )
 
-    answer_callback(callback_id)
+    # پاسخ Callback بدون متوقف کردن روند بازی
+    answer_callback_async(callback_id)
 
     if game.get("message_id"):
         edit_message(
@@ -597,56 +689,109 @@ def finish_game(chat_id):
         f"{message}"
     )
 
+    # پایان طبیعی چالش → آماده چالش جدید
+    games.pop(chat_id, None)
+
     send_message(
         chat_id,
         text,
         main_keyboard()
     )
 
-    games.pop(chat_id, None)
+
+def stop_game(chat_id):
+    """توقف کامل چالش فعال کاربر."""
+
+    lock = get_game_lock(chat_id)
+
+    with lock:
+        game = games.pop(chat_id, None)
+
+    if not game:
+        send_message(
+            chat_id,
+            "ℹ️ در حال حاضر چالش فعالی ندارید.",
+            main_keyboard()
+        )
+        return
+
+    # با حذف بازی از games، تمام تایمرهای قبلی
+    # دیگر نمی‌توانند روی بازی جدید اثری بگذارند.
+    send_message(
+        chat_id,
+        "⛔ <b>چالش متوقف شد.</b>\n\n"
+        "شما اکنون آماده شروع یک چالش جدید هستید.",
+        main_keyboard()
+    )
 
 
 def start_game(chat_id, level):
-    if chat_id in games:
-        return
+    """
+    شروع چالش.
+    با قفل اختصاصی کاربر تضمین می‌شود
+    فقط یک چالش هم‌زمان وجود داشته باشد.
+    """
 
-    if level not in QUESTIONS:
-        send_message(
-            chat_id,
-            "متأسفانه سؤال‌های این سطح در دسترس نیست."
+    lock = get_game_lock(chat_id)
+
+    with lock:
+        # اگر کاربر از قبل چالش فعال دارد،
+        # چالش جدید شروع نمی‌شود.
+        if chat_id in games:
+            send_message(
+                chat_id,
+                "⚠️ <b>یک چالش در حال اجراست.</b>\n\n"
+                "ابتدا چالش فعلی را به پایان برسانید "
+                "یا با دکمه «⛔ توقف چالش» آن را متوقف کنید.",
+                stop_keyboard()
+            )
+            return
+
+        if level not in QUESTIONS:
+            send_message(
+                chat_id,
+                "متأسفانه سؤال‌های این سطح در دسترس نیست."
+            )
+            return
+
+        available = QUESTIONS[level]
+
+        if len(available) < QUESTION_COUNT:
+            send_message(
+                chat_id,
+                "تعداد سؤال‌های این سطح برای شروع چالش کافی نیست."
+            )
+            return
+
+        selected = random.sample(
+            available,
+            QUESTION_COUNT
         )
-        return
 
-    available = QUESTIONS[level]
+        prepared_questions = [
+            prepare_question(q)
+            for q in selected
+        ]
 
-    if len(available) < QUESTION_COUNT:
-        send_message(
-            chat_id,
-            "تعداد سؤال‌های این سطح برای شروع چالش کافی نیست."
-        )
-        return
+        games[chat_id] = {
+            "level": level,
+            "questions": prepared_questions,
+            "current": 0,
+            "score": 0,
+            "wrong_answers": 0,
+            "message_id": None,
+            "question_started": None,
+            "question_deadline": None,
+            "timer_id": None,
+            "answered": False,
+        }
 
-    selected = random.sample(
-        available,
-        QUESTION_COUNT
+    # صفحه‌کلید توقف در تمام مدت چالش فعال است
+    send_message(
+        chat_id,
+        "⛔ برای توقف چالش در هر لحظه، دکمه زیر را بزنید.",
+        stop_keyboard()
     )
-
-    prepared_questions = [
-        prepare_question(q)
-        for q in selected
-    ]
-
-    games[chat_id] = {
-        "level": level,
-        "questions": prepared_questions,
-        "current": 0,
-        "score": 0,
-        "wrong_answers": 0,
-        "message_id": None,
-        "question_started": None,
-        "timer_id": None,
-        "answered": False,
-    }
 
     countdown_message = send_message(
         chat_id,
@@ -663,6 +808,15 @@ def start_game(chat_id, level):
         if countdown_id:
             time.sleep(0.7)
 
+            # اگر کاربر در زمان شمارش معکوس چالش را
+            # متوقف کرده باشد، ادامه نده.
+            if chat_id not in games:
+                delete_message(
+                    chat_id,
+                    countdown_id
+                )
+                return
+
             edit_message(
                 chat_id,
                 countdown_id,
@@ -670,6 +824,13 @@ def start_game(chat_id, level):
             )
 
             time.sleep(0.7)
+
+            if chat_id not in games:
+                delete_message(
+                    chat_id,
+                    countdown_id
+                )
+                return
 
             edit_message(
                 chat_id,
@@ -679,10 +840,21 @@ def start_game(chat_id, level):
 
             time.sleep(0.7)
 
+            if chat_id not in games:
+                delete_message(
+                    chat_id,
+                    countdown_id
+                )
+                return
+
             delete_message(
                 chat_id,
                 countdown_id
             )
+
+    # اگر در زمان شمارش معکوس چالش متوقف شده باشد
+    if chat_id not in games:
+        return
 
     send_message(
         chat_id,
@@ -693,6 +865,10 @@ def start_game(chat_id, level):
     )
 
     time.sleep(0.5)
+
+    # آخرین بررسی قبل از ارسال سؤال اول
+    if chat_id not in games:
+        return
 
     send_question(chat_id)
 
@@ -712,11 +888,27 @@ def handle_update(update):
         if not chat_id:
             return
 
+        # توقف چالش با Reply Keyboard
+        if text == "⛔ توقف چالش":
+            stop_game(chat_id)
+            return
+
         if text in [
             "/start",
             "شروع",
             "شروع چالش"
         ]:
+            # اگر چالش فعال است، اجازه شروع چالش دوم داده نمی‌شود
+            if chat_id in games:
+                send_message(
+                    chat_id,
+                    "⚠️ <b>یک چالش در حال اجراست.</b>\n\n"
+                    "برای شروع چالش جدید، ابتدا چالش فعلی را "
+                    "به پایان برسانید یا آن را متوقف کنید.",
+                    stop_keyboard()
+                )
+                return
+
             send_message(
                 chat_id,
                 start_message(),
@@ -747,11 +939,23 @@ def handle_update(update):
     chat_id = chat.get("id")
 
     if not chat_id:
-        answer_callback(callback_id)
+        answer_callback_async(callback_id)
         return
 
     if data == "start_challenge":
-        answer_callback(callback_id)
+        # پاسخ Callback دیگر روند نمایش سطح را متوقف نمی‌کند
+        answer_callback_async(callback_id)
+
+        # اگر بازی فعال است، چالش دوم شروع نشود
+        if chat_id in games:
+            send_message(
+                chat_id,
+                "⚠️ <b>یک چالش در حال اجراست.</b>\n\n"
+                "برای شروع چالش جدید، ابتدا چالش فعلی را "
+                "به پایان برسانید یا آن را متوقف کنید.",
+                stop_keyboard()
+            )
+            return
 
         edit_message(
             chat_id,
@@ -769,7 +973,8 @@ def handle_update(update):
             1
         )
 
-        answer_callback(callback_id)
+        # پاسخ Callback در Thread جدا اجرا می‌شود
+        answer_callback_async(callback_id)
 
         if level not in LEVEL_NAMES:
             return
@@ -828,4 +1033,7 @@ if __name__ == "__main__":
                 5000
             )
         )
-                )
+    )
+
+
+
