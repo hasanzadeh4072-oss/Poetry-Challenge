@@ -10,6 +10,12 @@ from flask import Flask, request
 app = Flask(__name__)
 
 TOKEN = os.getenv("SOROUSH_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError(
+        "SOROUSH_TOKEN environment variable is not set."
+    )
+
 API_BASE = f"https://api.splus.ir/bot{TOKEN}"
 
 QUESTION_COUNT = 7
@@ -497,8 +503,6 @@ def send_question(chat_id):
             + QUESTION_TIME
         )
 
-        # مهم:
-        # هر سؤال جدید باید دوباره قابل پاسخ باشد.
         game["answered"] = False
 
         timer_id = object()
@@ -664,6 +668,10 @@ def process_answer(
     question_token,
     option_index
 ):
+    # پاسخ به Callback را بلافاصله انجام می‌دهیم
+    # تا دکمه برای کاربر معطل نماند.
+    answer_callback_async(callback_id)
+
     lock = get_game_lock(chat_id)
 
     with lock:
@@ -675,11 +683,6 @@ def process_answer(
                 f"chat={chat_id} "
                 f"reason=no_game"
             )
-
-            answer_callback_async(
-                callback_id
-            )
-
             return
 
         current = game["current"]
@@ -693,10 +696,6 @@ def process_answer(
                 f"current_token="
                 f"{game.get('question_token')}"
             )
-
-            answer_callback_async(
-                callback_id
-            )
             return
 
         if game.get("answered"):
@@ -706,16 +705,9 @@ def process_answer(
                 f"reason=already_answered "
                 f"question={current + 1}"
             )
-
-            answer_callback_async(
-                callback_id
-            )
             return
 
         if current >= QUESTION_COUNT:
-            answer_callback_async(
-                callback_id
-            )
             return
 
         deadline = game.get(
@@ -763,18 +755,12 @@ def process_answer(
                 ValueError,
                 TypeError
             ):
-                answer_callback_async(
-                    callback_id
-                )
                 return
 
             if (
                 option_index < 0
                 or option_index >= len(options)
             ):
-                answer_callback_async(
-                    callback_id
-                )
                 return
 
             selected_answer = options[
@@ -837,10 +823,6 @@ def process_answer(
                 f"token={question_token} "
                 f"selected={selected_answer}"
             )
-
-    answer_callback_async(
-        callback_id
-    )
 
     schedule_next_question(
         chat_id,
@@ -1357,4 +1339,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-)
+    )
