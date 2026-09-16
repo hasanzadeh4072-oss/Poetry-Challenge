@@ -469,7 +469,7 @@ def stop_keyboard():
 # Inline Keyboard پاسخ سؤال
 # ==================================================
 
-def answer_keyboard(options):
+def answer_keyboard(options, question_token):
 
     rows = []
 
@@ -478,7 +478,9 @@ def answer_keyboard(options):
         rows.append([
             {
                 "text": str(option),
-                "callback_data": f"answer_{index}"
+                "callback_data": (
+                    f"answer_{question_token}_{index}"
+                )
             }
         ])
 
@@ -552,6 +554,9 @@ def send_question(chat_id):
             question = prepared["question"]
             options = prepared["options"]
 
+            # شناسه اختصاصی همین سؤال
+            question_token = game["question_token"]
+
             text = (
                 f"❓ <b>سؤال {index + 1} از "
                 f"{QUESTION_COUNT}</b>\n\n"
@@ -567,11 +572,18 @@ def send_question(chat_id):
     result = send_message(
         chat_id,
         text,
-        answer_keyboard(options),
+        answer_keyboard(
+            options,
+            question_token
+        ),
         context=f"question_{index + 1}"
     )
 
     if not result:
+        print(
+            f"QUESTION SEND FAILED: "
+            f"chat={chat_id} question={index + 1}"
+        )
         return
 
     message = result.get(
@@ -584,6 +596,10 @@ def send_question(chat_id):
     )
 
     if not message_id:
+        print(
+            f"QUESTION MESSAGE ID MISSING: "
+            f"chat={chat_id} question={index + 1}"
+        )
         return
 
     lock = get_game_lock(chat_id)
@@ -596,6 +612,9 @@ def send_question(chat_id):
             return
 
         if game["current"] != index:
+            return
+
+        if game["question_token"] != question_token:
             return
 
         game["message_id"] = message_id
@@ -613,11 +632,19 @@ def send_question(chat_id):
 
         game["timer_id"] = timer_id
 
+    print(
+        f"QUESTION ACTIVE: "
+        f"chat={chat_id} "
+        f"question={index + 1} "
+        f"token={question_token}"
+    )
+
     threading.Thread(
         target=question_timeout,
         args=(
             chat_id,
             index,
+            question_token,
             timer_id
         ),
         daemon=True
@@ -687,6 +714,7 @@ def schedule_next_question(
 def question_timeout(
     chat_id,
     question_index,
+    question_token,
     timer_id
 ):
 
@@ -697,6 +725,12 @@ def question_timeout(
         game = games.get(chat_id)
 
         if not game:
+            return
+
+        if game.get("current") != question_index:
+            return
+
+        if game.get("question_token") != question_token:
             return
 
         start_time = game.get(
@@ -731,6 +765,9 @@ def question_timeout(
         if game.get("current") != question_index:
             return
 
+        if game.get("question_token") != question_token:
+            return
+
         if game.get("timer_id") is not timer_id:
             return
 
@@ -745,8 +782,24 @@ def question_timeout(
         )
 
         game["current"] += 1
+        game["question_token"] += 1
 
         expected_current = game["current"]
+
+    print(
+        f"QUESTION TIMEOUT: "
+        f"chat={chat_id} "
+        f"question={question_index + 1} "
+        f"token={question_token}"
+    )
+
+    # مهم:
+    # سؤال بعدی را قبل از editMessageText زمان‌بندی می‌کنیم.
+    # بنابراین اگر API ادیت پیام گیر کرد، بازی متوقف نمی‌شود.
+    schedule_next_question(
+        chat_id,
+        expected_current
+    )
 
     if message_id:
 
@@ -761,22 +814,6 @@ def question_timeout(
             context=f"timeout_question_{question_index + 1}"
         )
 
-    lock = get_game_lock(chat_id)
-
-    with lock:
-
-        game = games.get(chat_id)
-
-        if not game:
-            return
-
-        game["answered"] = False
-
-    schedule_next_question(
-        chat_id,
-        expected_current
-    )
-
 
 # ==================================================
 # پردازش پاسخ
@@ -785,6 +822,7 @@ def question_timeout(
 def process_answer(
     chat_id,
     callback_id,
+    question_token,
     option_index
 ):
 
@@ -796,13 +834,10 @@ def process_answer(
 
         if not game:
 
-            answer_callback_async(
-                callback_id
+            print(
+                f"ANSWER IGNORED: "
+                f"chat={chat_id} reason=no_game"
             )
-
-            return
-
-        if game.get("answered"):
 
             answer_callback_async(
                 callback_id
@@ -812,6 +847,41 @@ def process_answer(
 
         current = game["current"]
 
+        # ------------------------------------------
+        # جلوگیری از پاسخ سؤال قدیمی
+        # ------------------------------------------
+
+        if game.get("question_token") != question_token:
+
+            print(
+                f"ANSWER IGNORED: "
+                f"chat={chat_id} "
+                f"reason=stale_question "
+                f"received_token={question_token} "
+                f"current_token={game.get('question_token')}"
+            )
+
+            answer_callback_async(
+                callback_id
+            )
+
+            return
+
+        if game.get("answered"):
+
+            print(
+                f"ANSWER IGNORED: "
+                f"chat={chat_id} "
+                f"reason=already_answered "
+                f"question={current + 1}"
+            )
+
+            answer_callback_async(
+                callback_id
+            )
+
+            return
+
         if current >= QUESTION_COUNT:
 
             answer_callback_async(
@@ -819,6 +889,18 @@ def process_answer(
             )
 
             return
+
+        # ------------------------------------------
+        # بررسی message_id
+        # ------------------------------------------
+
+        callback_message_id = (
+            None
+        )
+
+        # message_id از callback در handle_update
+        # در صورت نیاز از آنجا منتقل می‌شود.
+        # در اینجا فقط token ملاک اصلی است.
 
         deadline = game.get(
             "question_deadline"
@@ -841,10 +923,18 @@ def process_answer(
             )
 
             game["current"] += 1
+            game["question_token"] += 1
 
             expected_current = game["current"]
 
             timeout_case = True
+
+            print(
+                f"LATE ANSWER: "
+                f"chat={chat_id} "
+                f"question={current + 1} "
+                f"token={question_token}"
+            )
 
         else:
 
@@ -942,15 +1032,34 @@ def process_answer(
                 )
 
             game["current"] += 1
+            game["question_token"] += 1
 
             expected_current = game["current"]
 
+            print(
+                f"ANSWER ACCEPTED: "
+                f"chat={chat_id} "
+                f"question={current + 1} "
+                f"token={question_token} "
+                f"selected={selected_answer}"
+            )
+
     # ----------------------------------------------
-    # پاسخ Callback بدون معطل کردن منطق بازی
+    # Callback را سریع پاسخ می‌دهیم
     # ----------------------------------------------
 
     answer_callback_async(
         callback_id
+    )
+
+    # ----------------------------------------------
+    # سؤال بعدی را مستقل از editMessageText
+    # زمان‌بندی می‌کنیم.
+    # ----------------------------------------------
+
+    schedule_next_question(
+        chat_id,
+        expected_current
     )
 
     # ----------------------------------------------
@@ -972,40 +1081,20 @@ def process_answer(
                 context=f"late_answer_question_{current + 1}"
             )
 
+        return
+
     # ----------------------------------------------
     # پاسخ عادی
     # ----------------------------------------------
 
-    else:
+    if message_id:
 
-        if message_id:
-
-            edit_message(
-                chat_id,
-                message_id,
-                result_text,
-                context=f"answer_question_{current + 1}"
-            )
-
-    # ----------------------------------------------
-    # سؤال بعدی
-    # ----------------------------------------------
-
-    lock = get_game_lock(chat_id)
-
-    with lock:
-
-        game = games.get(chat_id)
-
-        if not game:
-            return
-
-        game["answered"] = False
-
-    schedule_next_question(
-        chat_id,
-        expected_current
-    )
+        edit_message(
+            chat_id,
+            message_id,
+            result_text,
+            context=f"answer_question_{current + 1}"
+        )
 
 
 # ==================================================
@@ -1188,6 +1277,9 @@ def start_game(chat_id, level):
             "question_deadline": None,
             "timer_id": None,
             "answered": False,
+
+            # شناسه اختصاصی سؤال
+            "question_token": 1,
         }
 
     countdown_message = send_message(
@@ -1478,15 +1570,52 @@ def handle_update(update):
 
     if data.startswith("answer_"):
 
-        option_index = data.replace(
-            "answer_",
-            "",
-            1
-        )
+        parts = data.split("_")
+
+        # فرمت جدید:
+        # answer_<question_token>_<option_index>
+
+        if len(parts) != 3:
+
+            print(
+                f"INVALID CALLBACK DATA: {data}"
+            )
+
+            answer_callback_async(
+                callback_id
+            )
+
+            return
+
+        try:
+
+            question_token = int(
+                parts[1]
+            )
+
+            option_index = int(
+                parts[2]
+            )
+
+        except (
+            ValueError,
+            TypeError
+        ):
+
+            print(
+                f"INVALID CALLBACK VALUES: {data}"
+            )
+
+            answer_callback_async(
+                callback_id
+            )
+
+            return
 
         process_answer(
             chat_id,
             callback_id,
+            question_token,
             option_index
         )
 
