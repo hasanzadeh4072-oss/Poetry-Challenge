@@ -680,16 +680,6 @@ def process_answer(
                 callback_id
             )
 
-            send_message(
-                chat_id,
-                (
-                    "⚠️ <b>چالش قبلی به دلیل راه‌اندازی مجدد بات متوقف شده است.</b>\n\n"
-                    "لطفاً دکمه «⛔ توقف چالش» را بزنید و سپس یک چالش جدید شروع کنید."
-                ),
-                stop_keyboard(),
-                context="restart_recovery"
-            )
-
             return
 
         current = game["current"]
@@ -1367,4 +1357,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-    )
+)
