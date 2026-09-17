@@ -919,6 +919,45 @@ def process_answer(
         )
 
 
+def perfect_score_animation(chat_id):
+    animation = [
+        "🏆",
+        "🏆✨",
+        "🏆🎉✨",
+        "🏆🎉🌟",
+        "🏆🎉🌟\n\n"
+        "تبریک! همهٔ ۷ سؤال را درست پاسخ دادی!"
+    ]
+
+    result = send_message(
+        chat_id,
+        animation[0],
+        context="perfect_score_animation"
+    )
+
+    if not result:
+        return
+
+    message_id = (
+        result
+        .get("result", {})
+        .get("message_id")
+    )
+
+    if not message_id:
+        return
+
+    for index, frame in enumerate(animation[1:], start=1):
+        time.sleep(0.6)
+
+        edit_message(
+            chat_id,
+            message_id,
+            frame,
+            context=f"perfect_animation_{index}"
+        )
+
+
 def finish_game(chat_id):
     lock = get_game_lock(chat_id)
 
@@ -952,6 +991,9 @@ def finish_game(chat_id):
         "unanswered",
         0
     )
+
+    if correct_answers == QUESTION_COUNT:
+        perfect_score_animation(chat_id)
 
     if score >= 700:
         message = (
