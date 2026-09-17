@@ -686,6 +686,7 @@ def question_timeout(
             "message_id"
         )
 
+        game["unanswered"] += 1
         game["current"] += 1
         game["question_token"] += 1
 
@@ -780,6 +781,7 @@ def process_answer(
                 "message_id"
             )
 
+            game["unanswered"] += 1
             game["current"] += 1
             game["question_token"] += 1
 
@@ -835,6 +837,7 @@ def process_answer(
 
             if selected_answer == correct_answer:
                 game["score"] += 100
+                game["correct_answers"] += 1
 
                 result_text = (
                     "✅ <b>پاسخ صحیح</b>\n\n"
@@ -935,6 +938,21 @@ def finish_game(chat_id):
         game["level"]
     )
 
+    correct_answers = game.get(
+        "correct_answers",
+        0
+    )
+
+    wrong_answers = game.get(
+        "wrong_answers",
+        0
+    )
+
+    unanswered = game.get(
+        "unanswered",
+        0
+    )
+
     if score >= 700:
         message = (
             "🏆 فوق‌العاده بود ! "
@@ -962,7 +980,10 @@ def finish_game(chat_id):
     text = (
         "🎉 <b>چالش به پایان رسید!</b>\n\n"
         f"سطح: <b>{level}</b>\n"
-        f"تعداد سؤال: <b>{QUESTION_COUNT}</b>\n"
+        f"تعداد سؤال: <b>{QUESTION_COUNT}</b>\n\n"
+        f"✅ پاسخ صحیح: <b>{correct_answers}</b>\n"
+        f"❌ پاسخ اشتباه: <b>{wrong_answers}</b>\n"
+        f"⏱ بدون پاسخ: <b>{unanswered}</b>\n\n"
         f"امتیاز نهایی: <b>{score}</b>\n\n"
         f"{message}"
     )
@@ -1060,7 +1081,9 @@ def start_game(chat_id, level):
             "questions": prepared_questions,
             "current": 0,
             "score": 0,
+            "correct_answers": 0,
             "wrong_answers": 0,
+            "unanswered": 0,
             "message_id": None,
             "question_started": None,
             "question_deadline": None,
@@ -1432,4 +1455,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-            )
+    )
