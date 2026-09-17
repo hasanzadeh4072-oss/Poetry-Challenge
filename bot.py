@@ -939,14 +939,14 @@ def perfect_score_animation(chat_id):
             )
         )
 
+        time.sleep(1.2)
+
         if result:
             message_id = (
                 result
                 .get("result", {})
                 .get("message_id")
             )
-
-            time.sleep(0.9)
 
             if message_id:
                 delete_message(
@@ -956,8 +956,6 @@ def perfect_score_animation(chat_id):
                         f"delete_perfect_animation_{index}"
                     )
                 )
-        else:
-            time.sleep(0.9)
 
 
 def finish_game(chat_id):
@@ -1499,4 +1497,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-        )
+    )
