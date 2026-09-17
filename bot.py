@@ -859,8 +859,10 @@ def process_answer(
 
                 result_text = (
                     "❌ <b>پاسخ غلط</b>\n\n"
-                    f"پاسخ صحیح: "
-                    f"{correct_answer}\n"
+                    f"❓ <b>سؤال:</b>\n"
+                    f"{question['سؤال']}\n\n"
+                    f"✅ <b>پاسخ صحیح:</b> "
+                    f"{correct_answer}\n\n"
                     f"{penalty_text}\n"
                     f"امتیاز فعلی: "
                     f"{game['score']}"
@@ -1431,3 +1433,6 @@ if __name__ == "__main__":
             )
         )
     )
+
+
+
