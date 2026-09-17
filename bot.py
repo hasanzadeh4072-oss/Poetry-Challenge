@@ -603,7 +603,6 @@ def continue_game(chat_id, expected_current):
 
     if should_finish:
         finish_game(chat_id)
-
     else:
         send_question(chat_id)
 
@@ -922,40 +921,43 @@ def process_answer(
 def perfect_score_animation(chat_id):
     animation = [
         "🏆",
-        "🏆✨",
-        "🏆🎉✨",
-        "🏆🎉🌟",
-        "🏆🎉🌟\n\n"
-        "تبریک! همهٔ ۷ سؤال را درست پاسخ دادی!"
+        "✨",
+        "🎉",
+        "🌟",
+        "🏆",
     ]
 
-    result = send_message(
-        chat_id,
-        animation[0],
-        context="perfect_score_animation"
-    )
-
-    if not result:
-        return
-
-    message_id = (
-        result
-        .get("result", {})
-        .get("message_id")
-    )
-
-    if not message_id:
-        return
-
-    for index, frame in enumerate(animation[1:], start=1):
-        time.sleep(0.6)
-
-        edit_message(
+    for index, emoji in enumerate(
+        animation,
+        start=1
+    ):
+        result = send_message(
             chat_id,
-            message_id,
-            frame,
-            context=f"perfect_animation_{index}"
+            emoji,
+            context=(
+                f"perfect_score_animation_{index}"
+            )
         )
+
+        if result:
+            message_id = (
+                result
+                .get("result", {})
+                .get("message_id")
+            )
+
+            time.sleep(0.9)
+
+            if message_id:
+                delete_message(
+                    chat_id,
+                    message_id,
+                    context=(
+                        f"delete_perfect_animation_{index}"
+                    )
+                )
+        else:
+            time.sleep(0.9)
 
 
 def finish_game(chat_id):
@@ -1497,4 +1499,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-    )
+        )
