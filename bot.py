@@ -1471,6 +1471,11 @@ def home():
     return "Poetry Challenge Bot is running."
 
 
+@app.route("/test", methods=["GET"])
+def test():
+    return "Soroush Mini App Test OK", 200
+
+
 @app.route("/miniapp", methods=["GET"])
 @app.route("/miniapp/", methods=["GET"])
 def miniapp_index():
