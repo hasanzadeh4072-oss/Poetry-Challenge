@@ -9,6 +9,9 @@ from flask import Flask, request, send_from_directory, jsonify
 
 app = Flask(__name__)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MINIAPP_DIR = os.path.join(BASE_DIR, "miniapp")
+
 TOKEN = os.getenv("SOROUSH_TOKEN")
 
 if not TOKEN:
@@ -264,7 +267,7 @@ def load_questions():
     for level, filename in LEVEL_FILES.items():
         try:
             with open(
-                filename,
+                os.path.join(BASE_DIR, filename),
                 "r",
                 encoding="utf-8"
             ) as f:
@@ -1463,15 +1466,11 @@ def handle_update(update):
 # Mini App
 # =========================
 
-@app.route("/", methods=["GET"])
-def home():
-    return "Poetry Challenge Bot is running."
-
-
+@app.route("/miniapp", methods=["GET"])
 @app.route("/miniapp/", methods=["GET"])
 def miniapp_index():
     return send_from_directory(
-        "miniapp",
+        MINIAPP_DIR,
         "index.html"
     )
 
@@ -1479,7 +1478,7 @@ def miniapp_index():
 @app.route("/miniapp/<path:filename>", methods=["GET"])
 def miniapp_static(filename):
     return send_from_directory(
-        "miniapp",
+        MINIAPP_DIR,
         filename
     )
 
@@ -1568,4 +1567,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-  )
+            )
