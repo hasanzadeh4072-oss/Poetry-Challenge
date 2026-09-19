@@ -1466,6 +1466,11 @@ def handle_update(update):
 # Mini App
 # =========================
 
+@app.route("/", methods=["GET"])
+def home():
+    return "Poetry Challenge Bot is running."
+
+
 @app.route("/miniapp", methods=["GET"])
 @app.route("/miniapp/", methods=["GET"])
 def miniapp_index():
@@ -1567,4 +1572,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-            )
+    )
