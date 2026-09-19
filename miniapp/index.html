@@ -2,145 +2,120 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <script src="https://app.splus.ir/js/soroush-web-app.js"></script>
+
     <title>چالش شعرانه</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/miniapp/style.css">
 </head>
 
 <body>
 
     <main class="app">
 
-        <header class="header">
-            <div class="logo">📚</div>
+        <section id="homeScreen" class="screen active">
+            <div class="logo">🌿</div>
+
             <h1>چالش شعرانه</h1>
-            <p>دانشت را در ادبیات فارسی محک بزن!</p>
-        </header>
-
-        <section id="home-screen" class="screen">
-
-            <button id="start-button" class="primary-button">
-                🎮 شروع چالش
-            </button>
-
-            <div class="info-box">
-                <div>🎯 ۳ سطح چالش</div>
-                <div>❓ ۷ سؤال</div>
-                <div>⏱️ ۹۰ ثانیه برای هر سؤال</div>
-            </div>
-
-        </section>
-
-
-        <section id="level-screen" class="screen hidden">
-
-            <h2>🎓 انتخاب سطح</h2>
 
             <p class="subtitle">
-                سطح موردنظر خود را انتخاب کنید.
+                دانسته‌های ادبی خود را در سه سطح بیازمایید
             </p>
 
             <div class="levels">
-
-                <button class="level-button" data-level="ashenaei">
-                    <strong>آشنایی</strong>
-                    <span>سطح مقدماتی</span>
+                <button class="level-btn" data-level="ashenaei">
+                    <span>آشنایی</span>
+                    <small>سطح مقدماتی</small>
                 </button>
 
-                <button class="level-button" data-level="danaei">
-                    <strong>دانایی</strong>
-                    <span>سطح متوسط</span>
+                <button class="level-btn" data-level="danaei">
+                    <span>دانایی</span>
+                    <small>سطح متوسط</small>
                 </button>
 
-                <button class="level-button" data-level="ostad">
-                    <strong>استادی</strong>
-                    <span>سطح پیشرفته</span>
+                <button class="level-btn" data-level="ostad">
+                    <span>استادی</span>
+                    <small>سطح پیشرفته</small>
                 </button>
-
             </div>
-
         </section>
 
-
-        <section id="game-screen" class="screen hidden">
+        <section id="gameScreen" class="screen">
 
             <div class="game-header">
+                <div>
+                    <span class="label">سطح</span>
+                    <strong id="levelName">آشنایی</strong>
+                </div>
 
-                <span id="question-number">
-                    سؤال ۱ از ۷
-                </span>
+                <div>
+                    <span class="label">امتیاز</span>
+                    <strong id="score">۰</strong>
+                </div>
 
-                <span id="score">
-                    امتیاز: ۰
-                </span>
-
+                <div>
+                    <span class="label">سؤال</span>
+                    <strong>
+                        <span id="questionNumber">۱</span>
+                        / ۷
+                    </strong>
+                </div>
             </div>
 
-            <div class="timer">
-                <span>⏱️</span>
-                <span id="timer">۹۰</span>
+            <div class="timer-container">
+                <div class="timer" id="timer">۱:۳۰</div>
             </div>
 
-            <div class="question-box">
+            <div class="question-card">
+                <div class="question" id="questionText">
+                    در حال آماده‌سازی سؤال...
+                </div>
 
-                <h2 id="question">
-                    سؤال
-                </h2>
-
+                <div class="options" id="options"></div>
             </div>
 
-            <div id="options" class="options"></div>
+            <button id="stopButton" class="stop-btn">
+                ⛔ توقف چالش
+            </button>
 
         </section>
 
+        <section id="resultScreen" class="screen">
 
-        <section id="result-screen" class="screen hidden">
+            <div class="result-icon">🏆</div>
 
-            <div class="result-icon">
-                🏆
-            </div>
+            <h2>چالش به پایان رسید</h2>
 
-            <h2>چالش به پایان رسید!</h2>
+            <div class="result-card">
 
-            <div class="result-box">
-
-                <p>
-                    سطح:
-                    <strong id="result-level"></strong>
-                </p>
-
-                <p>
-                    پاسخ صحیح:
-                    <strong id="result-correct"></strong>
-                </p>
-
-                <p>
-                    پاسخ اشتباه:
-                    <strong id="result-wrong"></strong>
-                </p>
-
-                <p>
-                    بدون پاسخ:
-                    <strong id="result-unanswered"></strong>
-                </p>
-
-                <div class="final-score">
-                    امتیاز نهایی:
-                    <strong id="result-score"></strong>
+                <div class="result-row">
+                    <span>سطح</span>
+                    <strong id="resultLevel">آشنایی</strong>
                 </div>
 
+                <div class="result-row">
+                    <span>امتیاز نهایی</span>
+                    <strong id="finalScore">۰</strong>
+                </div>
+
+                <div id="resultMessage" class="result-message"></div>
+
             </div>
 
-            <button id="restart-button" class="primary-button">
-                🔄 چالش دوباره
+            <button id="restartButton" class="primary-btn">
+                🔄 شروع دوباره
             </button>
 
         </section>
 
     </main>
 
-    <script src="app.js"></script>
+    <script src="/miniapp/app.js"></script>
 
 </body>
 </html>
