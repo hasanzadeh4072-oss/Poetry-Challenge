@@ -5,7 +5,7 @@ import threading
 import time
 
 import requests
-from flask import Flask, request
+from flask import Flask, request, send_from_directory, jsonify
 
 app = Flask(__name__)
 
@@ -324,6 +324,76 @@ def load_questions():
 
 QUESTIONS = load_questions()
 
+
+# =========================================================
+# MINI APP
+# =========================================================
+
+@app.route("/miniapp/", methods=["GET"])
+def miniapp_index():
+    return send_from_directory(
+        "miniapp",
+        "index.html"
+    )
+
+
+@app.route("/miniapp/<path:filename>", methods=["GET"])
+def miniapp_static(filename):
+    return send_from_directory(
+        "miniapp",
+        filename
+    )
+
+
+@app.route("/api/questions", methods=["GET"])
+def miniapp_questions():
+    level = request.args.get(
+        "level",
+        ""
+    ).strip().lower()
+
+    if level not in QUESTIONS:
+        return jsonify({
+            "ok": False,
+            "error": "سطح نامعتبر است."
+        }), 400
+
+    available_questions = QUESTIONS[level]
+
+    if len(available_questions) < QUESTION_COUNT:
+        return jsonify({
+            "ok": False,
+            "error": "تعداد سؤال‌های این سطح کافی نیست."
+        }), 400
+
+    result = []
+
+    for question in available_questions:
+        result.append({
+            "question": question.get(
+                "سؤال",
+                ""
+            ),
+            "correct_answer": question.get(
+                "پاسخ صحیح",
+                ""
+            ),
+            "options": question.get(
+                "گزینه‌ها",
+                []
+            )
+        })
+
+    return jsonify({
+        "ok": True,
+        "level": level,
+        "questions": result
+    })
+
+
+# =========================================================
+# BOT KEYBOARDS
+# =========================================================
 
 def main_keyboard():
     return {
@@ -1497,4 +1567,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-            )
+                )
