@@ -5,7 +5,7 @@ import threading
 import time
 
 import requests
-from flask import Flask, request
+from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
@@ -1456,6 +1456,65 @@ def handle_update(update):
 
     answer_callback_async(
         callback_id
+    )
+
+
+# ============================================================
+# Mini App API
+# ============================================================
+
+@app.route("/api/questions", methods=["GET"])
+def miniapp_questions():
+    level = request.args.get(
+        "level",
+        ""
+    ).strip()
+
+    if level not in QUESTIONS:
+        return jsonify({
+            "error": "سطح نامعتبر است."
+        }), 400
+
+    available = QUESTIONS[level]
+
+    if len(available) < QUESTION_COUNT:
+        return jsonify({
+            "error": "تعداد سؤال‌های این سطح کافی نیست."
+        }), 400
+
+    selected = random.sample(
+        available,
+        QUESTION_COUNT
+    )
+
+    result = []
+
+    for question in selected:
+        result.append({
+            "question": question["سؤال"],
+            "correct_answer": question["پاسخ صحیح"],
+            "options": question["گزینه‌ها"]
+        })
+
+    return jsonify({
+        "level": level,
+        "questions": result
+    })
+
+
+@app.route("/miniapp/", methods=["GET"])
+def miniapp_index():
+    return send_from_directory(
+        "miniapp",
+        "index.html"
+    )
+
+
+@app.route("/miniapp/<path:filename>", methods=["GET"])
+def miniapp_static(filename):
+    return send_from_directory(
+        "miniapp",
+        filename
     )
 
 
