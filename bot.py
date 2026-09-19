@@ -1285,9 +1285,7 @@ def handle_update(update):
                         [
                             {
                                 "text": "🧪 ورود به Mini App",
-                                "web_app": {
-                                    "url": MINIAPP_URL
-                                }
+                                "url": MINIAPP_URL
                             }
                         ]
                     ]
@@ -1594,4 +1592,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-                )
+        )
