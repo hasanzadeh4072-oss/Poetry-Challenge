@@ -33,6 +33,10 @@ LEVEL_NAMES = {
     "ostad": "استادی",
 }
 
+MINIAPP_URL = (
+    "https://poetry-challenge.onrender.com/miniapp/"
+)
+
 games = {}
 game_locks = {}
 game_locks_guard = threading.Lock()
@@ -331,6 +335,11 @@ def main_keyboard():
             [
                 {
                     "text": "شروع چالش"
+                }
+            ],
+            [
+                {
+                    "text": "🧪 Mini App (نسخه آزمایشی)"
                 }
             ],
             [
@@ -1259,6 +1268,33 @@ def handle_update(update):
             return
 
         if text in [
+            "🧪 Mini App (نسخه آزمایشی)",
+            "Mini App (نسخه آزمایشی)"
+        ]:
+            send_message(
+                chat_id,
+                (
+                    "🧪 <b>Mini App چالش شعرانه</b>\n\n"
+                    "این بخش در حال آزمایش است.\n"
+                    "ممکن است در برخی دستگاه‌ها یا نسخه‌های "
+                    "سروش پلاس به‌درستی اجرا نشود.\n\n"
+                    "برای ورود، دکمه زیر را انتخاب کنید."
+                ),
+                {
+                    "inline_keyboard": [
+                        [
+                            {
+                                "text": "🧪 ورود به Mini App",
+                                "url": MINIAPP_URL
+                            }
+                        ]
+                    ]
+                },
+                context="miniapp"
+            )
+            return
+
+        if text in [
             "💬 ارتباط با مدیر",
             "ارتباط با مدیر"
         ]:
@@ -1557,3 +1593,6 @@ if __name__ == "__main__":
             )
         )
     )
+
+
+
