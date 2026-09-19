@@ -1,301 +1,441 @@
-const API_URL = "/api";
+"use strict";
 
 const QUESTION_COUNT = 7;
 const QUESTION_TIME = 90;
 
-let selectedLevel = null;
-let questions = [];
-let currentQuestion = 0;
-let score = 0;
-let correctAnswers = 0;
-let wrongAnswers = 0;
-let unanswered = 0;
-let timerInterval = null;
-let answered = false;
+const API_URL = "/api";
 
-const homeScreen = document.getElementById("home-screen");
-const levelScreen = document.getElementById("level-screen");
-const gameScreen = document.getElementById("game-screen");
-const resultScreen = document.getElementById("result-screen");
+const LEVEL_NAMES = {
+    ashenaei: "آشنایی",
+    danaei: "دانایی",
+    ostad: "استادی"
+};
 
-const startButton = document.getElementById("start-button");
-const restartButton = document.getElementById("restart-button");
+const state = {
+    level: null,
+    levelName: "",
+    questions: [],
+    currentQuestion: 0,
+    score: 0,
+    wrongAnswers: 0,
+    timer: null,
+    timeLeft: QUESTION_TIME,
+    answered: false,
+    gameActive: false
+};
 
-const questionNumber = document.getElementById("question-number");
+const homeScreen = document.getElementById("homeScreen");
+const gameScreen = document.getElementById("gameScreen");
+const resultScreen = document.getElementById("resultScreen");
+
+const levelName = document.getElementById("levelName");
 const scoreElement = document.getElementById("score");
+const questionNumber = document.getElementById("questionNumber");
+const questionText = document.getElementById("questionText");
+const optionsContainer = document.getElementById("options");
 const timerElement = document.getElementById("timer");
-const questionElement = document.getElementById("question");
-const optionsElement = document.getElementById("options");
 
-const resultLevel = document.getElementById("result-level");
-const resultCorrect = document.getElementById("result-correct");
-const resultWrong = document.getElementById("result-wrong");
-const resultUnanswered = document.getElementById("result-unanswered");
-const resultScore = document.getElementById("result-score");
+const resultLevel = document.getElementById("resultLevel");
+const finalScore = document.getElementById("finalScore");
+const resultMessage = document.getElementById("resultMessage");
 
-
-function showScreen(screen) {
-    homeScreen.classList.add("hidden");
-    levelScreen.classList.add("hidden");
-    gameScreen.classList.add("hidden");
-    resultScreen.classList.add("hidden");
-
-    screen.classList.remove("hidden");
-}
-
-
-function shuffle(array) {
-    const copy = [...array];
-
-    for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-
-    return copy;
-}
-
+const stopButton = document.getElementById("stopButton");
+const restartButton = document.getElementById("restartButton");
 
 function toPersianNumber(value) {
-    return String(value).replace(/\d/g, digit => {
-        return "۰۱۲۳۴۵۶۷۸۹"[digit];
+    return String(value).replace(/\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[digit]);
+}
+
+function showScreen(screen) {
+    [homeScreen, gameScreen, resultScreen].forEach(item => {
+        item.classList.remove("active");
     });
+
+    screen.classList.add("active");
 }
 
+function shuffle(array) {
+    const result = [...array];
 
-function startGame(level) {
-    selectedLevel = level;
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
 
-    fetch(`${API_URL}/questions?level=${encodeURIComponent(level)}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error("خطا در دریافت سؤال‌ها");
-            }
+        [result[i], result[j]] = [result[j], result[i]];
+    }
 
-            return response.json();
-        })
-        .then(data => {
-            if (!data.questions || data.questions.length < QUESTION_COUNT) {
-                alert("تعداد سؤال‌های این سطح کافی نیست.");
-                return;
-            }
+    return result;
+}
 
-            questions = shuffle(data.questions).slice(
-                0,
-                QUESTION_COUNT
-            );
+async function loadQuestions(level) {
+    const response = await fetch(
+        `${API_URL}/questions?level=${encodeURIComponent(level)}`
+    );
 
-            currentQuestion = 0;
-            score = 0;
-            correctAnswers = 0;
-            wrongAnswers = 0;
-            unanswered = 0;
+    if (!response.ok) {
+        throw new Error("خطا در دریافت سؤال‌ها");
+    }
 
-            showScreen(gameScreen);
+    const data = await response.json();
 
-            showQuestion();
-        })
-        .catch(error => {
-            console.error(error);
+    if (!data || !Array.isArray(data.questions)) {
+        throw new Error("ساختار سؤال‌ها نامعتبر است");
+    }
 
-            alert(
-                "دریافت سؤال‌ها با مشکل مواجه شد.\n" +
-                "لطفاً دوباره تلاش کنید."
-            );
+    return data.questions;
+}
+
+async function startGame(level) {
+    state.level = level;
+    state.levelName = LEVEL_NAMES[level] || level;
+
+    state.currentQuestion = 0;
+    state.score = 0;
+    state.wrongAnswers = 0;
+    state.gameActive = false;
+
+    levelName.textContent = state.levelName;
+    scoreElement.textContent = toPersianNumber(0);
+
+    showScreen(gameScreen);
+
+    questionText.textContent = "در حال آماده‌سازی چالش...";
+    optionsContainer.innerHTML = "";
+
+    try {
+        const allQuestions = await loadQuestions(level);
+
+        if (allQuestions.length < QUESTION_COUNT) {
+            throw new Error("تعداد سؤال‌های این سطح کافی نیست");
+        }
+
+        state.questions = shuffle(allQuestions).slice(0, QUESTION_COUNT);
+        state.gameActive = true;
+
+        showQuestion();
+
+    } catch (error) {
+        console.error(error);
+
+        questionText.textContent =
+            "دریافت سؤال‌ها با مشکل مواجه شد.";
+
+        optionsContainer.innerHTML = "";
+
+        const retryButton = document.createElement("button");
+
+        retryButton.className = "primary-btn";
+        retryButton.textContent = "🔄 تلاش دوباره";
+
+        retryButton.addEventListener("click", () => {
+            startGame(level);
         });
-}
 
+        optionsContainer.appendChild(retryButton);
+    }
+}
 
 function showQuestion() {
-    clearInterval(timerInterval);
+    clearTimer();
 
-    if (currentQuestion >= QUESTION_COUNT) {
+    if (!state.gameActive) {
+        return;
+    }
+
+    if (state.currentQuestion >= state.questions.length) {
         finishGame();
         return;
     }
 
-    answered = false;
+    const current = state.questions[state.currentQuestion];
 
-    const item = questions[currentQuestion];
+    state.answered = false;
+    state.timeLeft = QUESTION_TIME;
 
     questionNumber.textContent =
-        `سؤال ${toPersianNumber(currentQuestion + 1)} از ${toPersianNumber(QUESTION_COUNT)}`;
+        toPersianNumber(state.currentQuestion + 1);
 
-    scoreElement.textContent =
-        `امتیاز: ${toPersianNumber(score)}`;
+    questionText.textContent =
+        current.question || current["سؤال"] || "";
 
-    questionElement.textContent = item.question;
+    optionsContainer.innerHTML = "";
 
-    optionsElement.innerHTML = "";
+    let options = current.options || current["گزینه‌ها"];
 
-    const options = shuffle(item.options);
+    if (!Array.isArray(options)) {
+        options = [];
+    }
 
-    options.forEach((option, index) => {
+    options = shuffle(options);
+
+    options.forEach(option => {
         const button = document.createElement("button");
 
-        button.className = "option-button";
-        button.textContent = option;
+        button.className = "option-btn";
+        button.type = "button";
+
+        button.textContent =
+            typeof option === "object"
+                ? option.text || option["متن"] || option.answer || ""
+                : option;
 
         button.addEventListener("click", () => {
-            submitAnswer(option, index, button);
+            answerQuestion(option, button);
         });
 
-        optionsElement.appendChild(button);
+        optionsContainer.appendChild(button);
     });
 
-    startTimer();
-}
+    updateTimer();
 
+    state.timer = setInterval(() => {
+        state.timeLeft--;
 
-function startTimer() {
-    let remaining = QUESTION_TIME;
+        updateTimer();
 
-    timerElement.textContent = toPersianNumber(remaining);
-
-    timerInterval = setInterval(() => {
-        remaining--;
-
-        timerElement.textContent =
-            toPersianNumber(Math.max(remaining, 0));
-
-        if (remaining <= 0) {
-            clearInterval(timerInterval);
-
-            if (!answered) {
-                handleTimeout();
-            }
+        if (state.timeLeft <= 0) {
+            clearTimer();
+            timeExpired();
         }
     }, 1000);
 }
 
+function updateTimer() {
+    const minutes = Math.floor(state.timeLeft / 60);
+    const seconds = state.timeLeft % 60;
 
-function disableOptions() {
-    const buttons = optionsElement.querySelectorAll(
-        ".option-button"
+    timerElement.textContent =
+        `${toPersianNumber(minutes)}:${toPersianNumber(
+            String(seconds).padStart(2, "0")
+        )}`;
+
+    timerElement.classList.remove("warning", "danger");
+
+    if (state.timeLeft <= 10) {
+        timerElement.classList.add("danger");
+    } else if (state.timeLeft <= 30) {
+        timerElement.classList.add("warning");
+    }
+}
+
+function normalizeText(value) {
+    return String(value ?? "")
+        .trim()
+        .replace(/ي/g, "ی")
+        .replace(/ك/g, "ک");
+}
+
+function getCorrectAnswer(question) {
+    return (
+        question.correct_answer ??
+        question["پاسخ صحیح"] ??
+        question.correct ??
+        ""
     );
+}
+
+function isCorrect(option, question) {
+    const correctAnswer = getCorrectAnswer(question);
+
+    if (typeof option === "object") {
+        const optionValue =
+            option.value ??
+            option["مقدار"] ??
+            option.answer ??
+            option["پاسخ"] ??
+            option.text ??
+            option["متن"];
+
+        return (
+            normalizeText(optionValue) ===
+            normalizeText(correctAnswer)
+        );
+    }
+
+    return (
+        normalizeText(option) ===
+        normalizeText(correctAnswer)
+    );
+}
+
+function answerQuestion(option, selectedButton) {
+    if (
+        !state.gameActive ||
+        state.answered
+    ) {
+        return;
+    }
+
+    state.answered = true;
+
+    clearTimer();
+
+    const current = state.questions[state.currentQuestion];
+
+    const correct = isCorrect(option, current);
+
+    const buttons =
+        optionsContainer.querySelectorAll(".option-btn");
 
     buttons.forEach(button => {
         button.disabled = true;
     });
-}
 
-
-function submitAnswer(selectedAnswer, selectedIndex, clickedButton) {
-    if (answered) {
-        return;
-    }
-
-    answered = true;
-
-    clearInterval(timerInterval);
-
-    disableOptions();
-
-    const item = questions[currentQuestion];
-
-    const isCorrect =
-        selectedAnswer === item.correct_answer;
-
-    if (isCorrect) {
-        score += 100;
-        correctAnswers++;
-
-        clickedButton.textContent =
-            `✅ ${selectedAnswer}`;
-
+    if (correct) {
+        state.score += 100;
+        selectedButton.classList.add("correct");
     } else {
-        wrongAnswers++;
+        state.wrongAnswers++;
 
-        if (wrongAnswers % 2 === 0) {
-            score -= 15;
+        selectedButton.classList.add("wrong");
+
+        if (state.wrongAnswers % 2 === 0) {
+            state.score -= 15;
         }
 
-        clickedButton.textContent =
-            `❌ ${selectedAnswer}`;
+        buttons.forEach(button => {
+            const buttonValue = button.textContent;
+
+            if (
+                normalizeText(buttonValue) ===
+                normalizeText(getCorrectAnswer(current))
+            ) {
+                button.classList.add("correct");
+            }
+        });
     }
 
     scoreElement.textContent =
-        `امتیاز: ${toPersianNumber(score)}`;
+        toPersianNumber(state.score);
 
     setTimeout(() => {
-        currentQuestion++;
-        showQuestion();
+        nextQuestion();
     }, 700);
 }
 
-
-function handleTimeout() {
-    if (answered) {
+function timeExpired() {
+    if (
+        !state.gameActive ||
+        state.answered
+    ) {
         return;
     }
 
-    answered = true;
+    state.answered = true;
 
-    disableOptions();
+    const buttons =
+        optionsContainer.querySelectorAll(".option-btn");
 
-    unanswered++;
-
-    questionElement.textContent =
-        "⏱ زمان این سؤال تمام شد.";
+    buttons.forEach(button => {
+        button.disabled = true;
+    });
 
     setTimeout(() => {
-        currentQuestion++;
-        showQuestion();
-    }, 700);
+        nextQuestion();
+    }, 500);
 }
 
+function nextQuestion() {
+    if (!state.gameActive) {
+        return;
+    }
+
+    state.currentQuestion++;
+
+    if (
+        state.currentQuestion >=
+        state.questions.length
+    ) {
+        finishGame();
+    } else {
+        showQuestion();
+    }
+}
+
+function clearTimer() {
+    if (state.timer !== null) {
+        clearInterval(state.timer);
+        state.timer = null;
+    }
+}
 
 function finishGame() {
-    clearInterval(timerInterval);
+    clearTimer();
+
+    state.gameActive = false;
+
+    resultLevel.textContent = state.levelName;
+
+    finalScore.textContent =
+        toPersianNumber(state.score);
+
+    let message;
+
+    if (state.score >= 600) {
+        message = "فوق‌العاده! 🌟";
+    } else if (state.score >= 400) {
+        message = "عالی! 👏";
+    } else if (state.score >= 200) {
+        message = "خوب بود! 🌿";
+    } else {
+        message = "این پایان راه نیست؛ دوباره تلاش کن. 💚";
+    }
+
+    resultMessage.textContent = message;
 
     showScreen(resultScreen);
-
-    const levelNames = {
-        ashenaei: "آشنایی",
-        danaei: "دانایی",
-        ostad: "استادی"
-    };
-
-    resultLevel.textContent =
-        levelNames[selectedLevel] || selectedLevel;
-
-    resultCorrect.textContent =
-        toPersianNumber(correctAnswers);
-
-    resultWrong.textContent =
-        toPersianNumber(wrongAnswers);
-
-    resultUnanswered.textContent =
-        toPersianNumber(unanswered);
-
-    resultScore.textContent =
-        toPersianNumber(score);
 }
 
+function stopGame() {
+    if (!state.gameActive) {
+        showScreen(homeScreen);
+        return;
+    }
 
-startButton.addEventListener("click", () => {
-    showScreen(levelScreen);
-});
+    clearTimer();
 
+    state.gameActive = false;
 
-document.querySelectorAll(".level-button").forEach(button => {
+    showScreen(homeScreen);
+}
+
+document.querySelectorAll(".level-btn").forEach(button => {
     button.addEventListener("click", () => {
         const level = button.dataset.level;
 
-        startGame(level);
+        if (level) {
+            startGame(level);
+        }
     });
 });
 
+stopButton.addEventListener("click", stopGame);
 
 restartButton.addEventListener("click", () => {
-    selectedLevel = null;
-    questions = [];
-    currentQuestion = 0;
-    score = 0;
-    correctAnswers = 0;
-    wrongAnswers = 0;
-    unanswered = 0;
-
     showScreen(homeScreen);
 });
+
+function initializeSoroushWebApp() {
+    try {
+        if (
+            window.Soroush &&
+            window.Soroush.WebApp
+        ) {
+            const webApp = window.Soroush.WebApp;
+
+            if (typeof webApp.ready === "function") {
+                webApp.ready();
+            }
+
+            if (typeof webApp.expand === "function") {
+                webApp.expand();
+            }
+        }
+    } catch (error) {
+        console.error(
+            "Soroush WebApp initialization error:",
+            error
+        );
+    }
+}
+
+initializeSoroushWebApp();
