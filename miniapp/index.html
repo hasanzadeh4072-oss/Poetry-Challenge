@@ -1,1 +1,146 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>چالش شعرانه</title>
 
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="app">
+
+        <header class="header">
+            <div class="logo">📚</div>
+            <h1>چالش شعرانه</h1>
+            <p>دانشت را در ادبیات فارسی محک بزن!</p>
+        </header>
+
+        <section id="home-screen" class="screen">
+
+            <button id="start-button" class="primary-button">
+                🎮 شروع چالش
+            </button>
+
+            <div class="info-box">
+                <div>🎯 ۳ سطح چالش</div>
+                <div>❓ ۷ سؤال</div>
+                <div>⏱️ ۹۰ ثانیه برای هر سؤال</div>
+            </div>
+
+        </section>
+
+
+        <section id="level-screen" class="screen hidden">
+
+            <h2>🎓 انتخاب سطح</h2>
+
+            <p class="subtitle">
+                سطح موردنظر خود را انتخاب کنید.
+            </p>
+
+            <div class="levels">
+
+                <button class="level-button" data-level="ashenaei">
+                    <strong>آشنایی</strong>
+                    <span>سطح مقدماتی</span>
+                </button>
+
+                <button class="level-button" data-level="danaei">
+                    <strong>دانایی</strong>
+                    <span>سطح متوسط</span>
+                </button>
+
+                <button class="level-button" data-level="ostad">
+                    <strong>استادی</strong>
+                    <span>سطح پیشرفته</span>
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <section id="game-screen" class="screen hidden">
+
+            <div class="game-header">
+
+                <span id="question-number">
+                    سؤال ۱ از ۷
+                </span>
+
+                <span id="score">
+                    امتیاز: ۰
+                </span>
+
+            </div>
+
+            <div class="timer">
+                <span>⏱️</span>
+                <span id="timer">۹۰</span>
+            </div>
+
+            <div class="question-box">
+
+                <h2 id="question">
+                    سؤال
+                </h2>
+
+            </div>
+
+            <div id="options" class="options"></div>
+
+        </section>
+
+
+        <section id="result-screen" class="screen hidden">
+
+            <div class="result-icon">
+                🏆
+            </div>
+
+            <h2>چالش به پایان رسید!</h2>
+
+            <div class="result-box">
+
+                <p>
+                    سطح:
+                    <strong id="result-level"></strong>
+                </p>
+
+                <p>
+                    پاسخ صحیح:
+                    <strong id="result-correct"></strong>
+                </p>
+
+                <p>
+                    پاسخ اشتباه:
+                    <strong id="result-wrong"></strong>
+                </p>
+
+                <p>
+                    بدون پاسخ:
+                    <strong id="result-unanswered"></strong>
+                </p>
+
+                <div class="final-score">
+                    امتیاز نهایی:
+                    <strong id="result-score"></strong>
+                </div>
+
+            </div>
+
+            <button id="restart-button" class="primary-button">
+                🔄 چالش دوباره
+            </button>
+
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
