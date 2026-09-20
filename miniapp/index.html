@@ -2,6 +2,7 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
@@ -13,7 +14,7 @@
 
     <link
         rel="stylesheet"
-        href="./style.css"
+        href="/Poetry-Challenge/miniapp/style.css"
     >
 </head>
 
@@ -31,26 +32,38 @@
             </p>
 
             <div class="levels">
-                <button class="level-btn" data-level="ashenaei">
+
+                <button
+                    class="level-btn"
+                    data-level="ashenaei"
+                >
                     <span>آشنایی</span>
                     <small>سطح مقدماتی</small>
                 </button>
 
-                <button class="level-btn" data-level="danaei">
+                <button
+                    class="level-btn"
+                    data-level="danaei"
+                >
                     <span>دانایی</span>
                     <small>سطح متوسط</small>
                 </button>
 
-                <button class="level-btn" data-level="ostad">
+                <button
+                    class="level-btn"
+                    data-level="ostad"
+                >
                     <span>استادی</span>
                     <small>سطح پیشرفته</small>
                 </button>
+
             </div>
         </section>
 
         <section id="gameScreen" class="screen">
 
             <div class="game-header">
+
                 <div>
                     <span class="label">سطح</span>
                     <strong id="levelName">آشنایی</strong>
@@ -68,21 +81,38 @@
                         / ۷
                     </strong>
                 </div>
+
             </div>
 
             <div class="timer-container">
-                <div class="timer" id="timer">۱:۳۰</div>
+                <div
+                    class="timer"
+                    id="timer"
+                >
+                    ۱:۳۰
+                </div>
             </div>
 
             <div class="question-card">
-                <div class="question" id="questionText">
+
+                <div
+                    class="question"
+                    id="questionText"
+                >
                     در حال آماده‌سازی سؤال...
                 </div>
 
-                <div class="options" id="options"></div>
+                <div
+                    class="options"
+                    id="options"
+                ></div>
+
             </div>
 
-            <button id="stopButton" class="stop-btn">
+            <button
+                id="stopButton"
+                class="stop-btn"
+            >
                 ⛔ توقف چالش
             </button>
 
@@ -106,11 +136,17 @@
                     <strong id="finalScore">۰</strong>
                 </div>
 
-                <div id="resultMessage" class="result-message"></div>
+                <div
+                    id="resultMessage"
+                    class="result-message"
+                ></div>
 
             </div>
 
-            <button id="restartButton" class="primary-btn">
+            <button
+                id="restartButton"
+                class="primary-btn"
+            >
                 🔄 شروع دوباره
             </button>
 
@@ -118,7 +154,7 @@
 
     </main>
 
-    <script src="./app.js"></script>
+    <script src="/Poetry-Challenge/miniapp/app.js"></script>
 
 </body>
 </html>
