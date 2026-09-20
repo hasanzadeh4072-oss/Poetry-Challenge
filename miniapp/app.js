@@ -47,6 +47,7 @@ const timerElement = document.getElementById("timer");
 const resultLevel = document.getElementById("resultLevel");
 const finalScore = document.getElementById("finalScore");
 const resultMessage = document.getElementById("resultMessage");
+const resultStats = document.getElementById("resultStats");
 
 const stopButton = document.getElementById("stopButton");
 const restartButton = document.getElementById("restartButton");
@@ -119,15 +120,6 @@ async function loadQuestions(level) {
             return false;
         }
 
-        /*
-         * فایل آشنایی در حال حاضر شامل سؤال‌هایی
-         * از چند سطح است؛ بنابراین فقط سؤال‌های
-         * متعلق به سطح انتخاب‌شده را برمی‌داریم.
-         *
-         * اگر فایل‌های دانایی و استادی فقط سؤال‌های
-         * همان سطح را داشته باشند، این فیلتر نیز
-         * بدون ایجاد مشکل عمل می‌کند.
-         */
         if (question["سطح"]) {
             return question["سطح"] === selectedLevel;
         }
@@ -137,16 +129,6 @@ async function loadQuestions(level) {
 }
 
 function getOptions(question) {
-    /*
-     * حالت استاندارد:
-     *
-     * "گزینه‌ها": [
-     *   "...",
-     *   "...",
-     *   "...",
-     *   "..."
-     * ]
-     */
     let options = question["گزینه‌ها"];
 
     if (Array.isArray(options)) {
@@ -166,10 +148,6 @@ function getOptions(question) {
     const correct =
         question["پاسخ صحیح"];
 
-    /*
-     * اگر نوع سؤال صحیح/غلط باشد،
-     * گزینه‌ها را مستقیماً می‌سازیم.
-     */
     if (
         question["نوع سؤال"] === "صحیح/غلط"
     ) {
@@ -179,15 +157,6 @@ function getOptions(question) {
         ];
     }
 
-    /*
-     * در فایل آشنایی:
-     *
-     * "سایر گزینه‌های چالشی":
-     * "گوش, زبان, صورت"
-     *
-     * بنابراین اگر مقدار رشته باشد،
-     * آن را به آرایه تبدیل می‌کنیم.
-     */
     let others =
         question["سایر گزینه‌های چالشی"];
 
@@ -216,17 +185,11 @@ function getOptions(question) {
         others = [];
     }
 
-    /*
-     * گزینه صحیح + گزینه‌های غلط
-     */
     const allOptions = [
         correct,
         ...others
     ];
 
-    /*
-     * حذف گزینه‌های تکراری
-     */
     const uniqueOptions = [
         ...new Set(
             allOptions.map(option =>
@@ -652,11 +615,8 @@ function finishGame() {
         message;
 
     /*
-     * نمایش آمار پاسخ‌ها
+     * آمار نهایی چالش
      */
-    const resultStats =
-        document.getElementById("resultStats");
-
     if (resultStats) {
         resultStats.innerHTML = `
             <div>✅ پاسخ صحیح: ${toPersianNumber(state.correctAnswers)}</div>
