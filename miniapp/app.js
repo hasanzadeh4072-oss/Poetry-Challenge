@@ -674,387 +674,404 @@ function addPerfectAnimationStyles() {
     style.textContent = `
 
         .perfect-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
+            position: fixed !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 100vw !important;
+            height: 100vh !important;
 
-            overflow: hidden;
+            z-index: 2147483647 !important;
+
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+
+            overflow: hidden !important;
+
+            margin: 0 !important;
+            padding: 0 !important;
+
+            box-sizing: border-box !important;
 
             background:
                 radial-gradient(
                     circle at center,
-                    #273553 0%,
-                    #111827 48%,
-                    #050810 100%
-                );
+                    #303d60 0%,
+                    #151c30 42%,
+                    #05070d 100%
+                ) !important;
 
-            opacity: 0;
+            opacity: 1 !important;
 
-            animation:
-                perfectOverlayIn
-                0.7s ease forwards;
+            isolation: isolate !important;
         }
+
 
         .perfect-content {
-            position: relative;
-            z-index: 10;
+            position: relative !important;
 
-            width: 100%;
-            max-width: 500px;
+            width: 100% !important;
+            height: 100% !important;
 
-            min-height: 100%;
+            display: flex !important;
+            flex-direction: column !important;
 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            align-items: center !important;
+            justify-content: center !important;
 
-            text-align: center;
+            text-align: center !important;
+
+            z-index: 10 !important;
+
+            overflow: hidden !important;
+
+            box-sizing: border-box !important;
         }
 
+
         .perfect-glow {
-            position: absolute;
+            position: absolute !important;
 
-            width: 320px;
-            height: 320px;
+            width: 330px !important;
+            height: 330px !important;
 
-            border-radius: 50%;
+            border-radius: 50% !important;
 
             background:
                 radial-gradient(
                     circle,
-                    rgba(255,215,80,0.38),
-                    rgba(255,193,7,0.12) 42%,
+                    rgba(255,215,70,0.48),
+                    rgba(255,193,7,0.18) 40%,
                     transparent 72%
-                );
+                ) !important;
 
-            filter: blur(8px);
+            filter: blur(7px) !important;
+
+            z-index: 1 !important;
 
             animation:
                 perfectGlow
-                2.2s ease-in-out infinite;
+                2s ease-in-out infinite !important;
         }
 
+
         .perfect-ring {
-            position: absolute;
+            position: absolute !important;
 
-            border: 1px solid
-                rgba(255,215,90,0.25);
+            width: 300px !important;
+            height: 300px !important;
 
-            border-radius: 50%;
+            border:
+                2px solid
+                rgba(255,215,70,0.28) !important;
 
-            width: 360px;
-            height: 360px;
+            border-radius: 50% !important;
+
+            z-index: 2 !important;
 
             animation:
                 perfectRing
-                3s ease-in-out infinite;
+                2.8s ease-in-out infinite !important;
         }
+
 
         .perfect-ring.two {
-            width: 470px;
-            height: 470px;
+            width: 430px !important;
+            height: 430px !important;
 
-            animation-delay: 0.5s;
+            animation-delay: 0.4s !important;
         }
+
 
         .perfect-ring.three {
-            width: 610px;
-            height: 610px;
+            width: 580px !important;
+            height: 580px !important;
 
-            animation-delay: 1s;
+            animation-delay: 0.8s !important;
         }
 
+
         .perfect-trophy {
-            position: relative;
-            z-index: 5;
+            position: relative !important;
 
-            font-size: 105px;
+            z-index: 20 !important;
 
-            line-height: 1;
+            font-size: 105px !important;
 
-            opacity: 0;
+            line-height: 1 !important;
+
+            opacity: 0 !important;
+
+            transform:
+                translateY(100px)
+                scale(0.35) !important;
 
             filter:
                 drop-shadow(
                     0 0 12px
-                    rgba(255,215,70,0.95)
+                    rgba(255,215,70,1)
                 )
                 drop-shadow(
                     0 0 35px
-                    rgba(255,193,7,0.7)
-                );
+                    rgba(255,193,7,0.9)
+                ) !important;
 
             animation:
-                perfectTrophyIn
+                perfectTrophy
                 1s
                 cubic-bezier(.17,.89,.32,1.28)
-                0.2s
-                forwards,
-
-                perfectTrophyFloat
-                2.5s
-                ease-in-out
-                1.3s
-                infinite;
+                forwards !important;
         }
+
 
         .perfect-score-number {
-            position: relative;
-            z-index: 5;
+            position: relative !important;
 
-            margin-top: 8px;
+            z-index: 20 !important;
 
-            font-size: 88px;
-            font-weight: 900;
+            margin-top: 12px !important;
 
-            line-height: 1;
+            font-size: 88px !important;
+            font-weight: 900 !important;
 
-            color: #ffd54f;
+            line-height: 1 !important;
+
+            color: #ffd54f !important;
 
             text-shadow:
-                0 0 10px
-                rgba(255,215,70,0.9),
+                0 0 10px rgba(255,215,70,1),
+                0 0 25px rgba(255,193,7,0.9),
+                0 0 50px rgba(255,193,7,0.55) !important;
 
-                0 0 28px
-                rgba(255,193,7,0.7),
+            opacity: 0 !important;
 
-                0 0 55px
-                rgba(255,193,7,0.35);
-
-            opacity: 0;
+            transform: scale(0.2) !important;
 
             animation:
-                perfectScoreIn
-                0.8s
+                perfectScore
+                0.9s
                 cubic-bezier(.17,.89,.32,1.28)
-                1s
-                forwards;
+                0.6s
+                forwards !important;
         }
+
 
         .perfect-title {
-            position: relative;
-            z-index: 5;
+            position: relative !important;
 
-            margin-top: 18px;
+            z-index: 20 !important;
 
-            font-size: 26px;
-            font-weight: bold;
+            margin-top: 22px !important;
 
-            color: #fff3b0;
+            font-size: 28px !important;
+            font-weight: 900 !important;
 
-            opacity: 0;
+            color: #fff4b0 !important;
+
+            text-shadow:
+                0 0 12px
+                rgba(255,215,70,0.7) !important;
+
+            opacity: 0 !important;
 
             animation:
-                perfectTextIn
-                0.8s
+                perfectText
+                0.7s
                 ease
-                1.7s
-                forwards;
+                1.3s
+                forwards !important;
         }
+
 
         .perfect-subtitle {
-            position: relative;
-            z-index: 5;
+            position: relative !important;
 
-            margin-top: 12px;
+            z-index: 20 !important;
 
-            padding: 0 25px;
+            margin-top: 12px !important;
 
-            font-size: 16px;
+            padding: 0 24px !important;
 
-            line-height: 1.9;
+            font-size: 17px !important;
+
+            line-height: 1.9 !important;
 
             color:
-                rgba(255,255,255,0.84);
+                rgba(255,255,255,0.9) !important;
 
-            opacity: 0;
+            opacity: 0 !important;
 
             animation:
-                perfectTextIn
-                0.8s
+                perfectText
+                0.7s
                 ease
-                2s
-                forwards;
+                1.6s
+                forwards !important;
         }
 
+
         .perfect-particle {
-            position: absolute;
+            position: absolute !important;
+
+            z-index: 5 !important;
 
             width: 5px;
             height: 5px;
 
-            border-radius: 50%;
+            border-radius: 50% !important;
 
-            background: #ffd54f;
+            background: #ffd54f !important;
 
             box-shadow:
-                0 0 7px #ffd54f,
-                0 0 15px
-                rgba(255,193,7,0.8);
+                0 0 8px #ffd54f,
+                0 0 18px #ffb300 !important;
 
             animation:
                 perfectParticle
                 linear
-                infinite;
+                infinite !important;
         }
 
-        .perfect-confetti {
-            position: absolute;
 
-            top: -25px;
+        .perfect-confetti {
+            position: absolute !important;
+
+            top: -30px !important;
+
+            z-index: 15 !important;
 
             width: 8px;
             height: 15px;
 
-            border-radius: 1px;
+            border-radius: 2px !important;
 
             animation:
                 perfectConfetti
                 linear
-                forwards;
+                forwards !important;
         }
 
-        @keyframes perfectOverlayIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
 
         @keyframes perfectGlow {
             0%, 100% {
-                transform: scale(0.85);
-                opacity: 0.55;
+                transform: scale(0.8);
+                opacity: 0.5;
             }
 
             50% {
-                transform: scale(1.18);
+                transform: scale(1.2);
                 opacity: 1;
             }
         }
 
+
         @keyframes perfectRing {
             0%, 100% {
-                transform: scale(0.9);
+                transform: scale(0.88);
                 opacity: 0.12;
             }
 
             50% {
-                transform: scale(1.05);
-                opacity: 0.38;
+                transform: scale(1.08);
+                opacity: 0.42;
             }
         }
 
-        @keyframes perfectTrophyIn {
-            0% {
-                transform:
-                    translateY(180px)
-                    scale(0.2)
-                    rotate(-15deg);
 
+        @keyframes perfectTrophy {
+            0% {
                 opacity: 0;
+                transform:
+                    translateY(130px)
+                    scale(0.25)
+                    rotate(-15deg);
             }
 
-            70% {
-                transform:
-                    translateY(-15px)
-                    scale(1.12)
-                    rotate(3deg);
-
+            65% {
                 opacity: 1;
+                transform:
+                    translateY(-12px)
+                    scale(1.12)
+                    rotate(4deg);
             }
 
             100% {
+                opacity: 1;
                 transform:
                     translateY(0)
                     scale(1)
                     rotate(0);
-
-                opacity: 1;
             }
         }
 
-        @keyframes perfectTrophyFloat {
-            0%, 100% {
-                transform:
-                    translateY(0);
-            }
 
-            50% {
-                transform:
-                    translateY(-12px);
-            }
-        }
-
-        @keyframes perfectScoreIn {
+        @keyframes perfectScore {
             0% {
-                transform: scale(0.1);
                 opacity: 0;
+                transform: scale(0.15);
             }
 
             65% {
-                transform: scale(1.18);
                 opacity: 1;
+                transform: scale(1.18);
             }
 
             100% {
-                transform: scale(1);
                 opacity: 1;
+                transform: scale(1);
             }
         }
 
-        @keyframes perfectTextIn {
+
+        @keyframes perfectText {
             from {
                 opacity: 0;
-                transform:
-                    translateY(20px);
+                transform: translateY(20px);
             }
 
             to {
                 opacity: 1;
-                transform:
-                    translateY(0);
+                transform: translateY(0);
             }
         }
 
+
         @keyframes perfectParticle {
-            from {
+            0% {
                 transform:
                     translateY(110vh)
+                    scale(0.4)
                     rotate(0deg);
 
                 opacity: 0;
             }
 
-            10% {
+            15% {
                 opacity: 1;
             }
 
-            90% {
+            85% {
                 opacity: 1;
             }
 
-            to {
+            100% {
                 transform:
                     translateY(-15vh)
+                    scale(1)
                     rotate(360deg);
 
                 opacity: 0;
             }
         }
 
+
         @keyframes perfectConfetti {
             0% {
                 transform:
-                    translateY(-25px)
+                    translateY(-30px)
                     rotate(0deg);
 
                 opacity: 1;
@@ -1062,7 +1079,7 @@ function addPerfectAnimationStyles() {
 
             100% {
                 transform:
-                    translateY(110vh)
+                    translateY(115vh)
                     rotate(720deg);
 
                 opacity: 0;
@@ -1094,11 +1111,13 @@ function showPerfectScoreAnimation() {
         oldOverlay.remove();
     }
 
+
     const overlay =
         document.createElement("div");
 
     overlay.className =
         "perfect-overlay";
+
 
     const content =
         document.createElement("div");
@@ -1106,11 +1125,13 @@ function showPerfectScoreAnimation() {
     content.className =
         "perfect-content";
 
+
     const glow =
         document.createElement("div");
 
     glow.className =
         "perfect-glow";
+
 
     const ring1 =
         document.createElement("div");
@@ -1118,17 +1139,20 @@ function showPerfectScoreAnimation() {
     ring1.className =
         "perfect-ring";
 
+
     const ring2 =
         document.createElement("div");
 
     ring2.className =
         "perfect-ring two";
 
+
     const ring3 =
         document.createElement("div");
 
     ring3.className =
         "perfect-ring three";
+
 
     const trophy =
         document.createElement("div");
@@ -1139,6 +1163,7 @@ function showPerfectScoreAnimation() {
     trophy.textContent =
         "🏆";
 
+
     const score =
         document.createElement("div");
 
@@ -1147,6 +1172,7 @@ function showPerfectScoreAnimation() {
 
     score.textContent =
         "۰";
+
 
     const title =
         document.createElement("div");
@@ -1157,6 +1183,7 @@ function showPerfectScoreAnimation() {
     title.textContent =
         "✨ امتیاز کامل! ✨";
 
+
     const subtitle =
         document.createElement("div");
 
@@ -1165,6 +1192,7 @@ function showPerfectScoreAnimation() {
 
     subtitle.textContent =
         "شما هر ۷ سؤال را درست پاسخ دادید";
+
 
     content.appendChild(glow);
 
@@ -1179,7 +1207,14 @@ function showPerfectScoreAnimation() {
 
     overlay.appendChild(content);
 
-    document.body.appendChild(overlay);
+
+    /* -----------------------------------------
+       نمایش مستقیم روی کل صفحه
+    ----------------------------------------- */
+
+    document.body.appendChild(
+        overlay
+    );
 
 
     /* -----------------------------------------
@@ -1201,7 +1236,7 @@ function showPerfectScoreAnimation() {
             (3 + Math.random() * 5) + "s";
 
         particle.style.animationDelay =
-            Math.random() * 4 + "s";
+            Math.random() * 3 + "s";
 
         const size =
             2 + Math.random() * 5;
@@ -1212,7 +1247,9 @@ function showPerfectScoreAnimation() {
         particle.style.height =
             size + "px";
 
-        overlay.appendChild(particle);
+        overlay.appendChild(
+            particle
+        );
     }
 
 
@@ -1240,10 +1277,10 @@ function showPerfectScoreAnimation() {
             Math.random() * 100 + "%";
 
         piece.style.animationDuration =
-            (3 + Math.random() * 4) + "s";
+            (2.5 + Math.random() * 3.5) + "s";
 
         piece.style.animationDelay =
-            Math.random() * 1.3 + "s";
+            Math.random() * 1.2 + "s";
 
         piece.style.background =
             confettiColors[
@@ -1262,20 +1299,28 @@ function showPerfectScoreAnimation() {
         piece.style.height =
             width * 1.7 + "px";
 
-        overlay.appendChild(piece);
+        overlay.appendChild(
+            piece
+        );
     }
 
 
     /* -----------------------------------------
-       شمارش متحرک ۰ تا ۷۰۰
+       شمارش ۰ تا ۷۰۰
     ----------------------------------------- */
 
-    const duration = 1300;
+    const duration = 1500;
 
     const start =
         performance.now();
 
     function updateScore(now) {
+
+        if (
+            !overlay.parentNode
+        ) {
+            return;
+        }
 
         const progress =
             Math.min(
@@ -1299,25 +1344,26 @@ function showPerfectScoreAnimation() {
             toPersianNumber(value);
 
         if (progress < 1) {
+
             requestAnimationFrame(
                 updateScore
             );
+
         } else {
+
             score.textContent =
                 "۷۰۰";
         }
     }
 
-    setTimeout(() => {
-        requestAnimationFrame(
-            updateScore
-        );
-    }, 1000);
+
+    requestAnimationFrame(
+        updateScore
+    );
 
 
     /* -----------------------------------------
-       بعد از پایان انیمیشن
-       نمایش نتیجه اصلی
+       پایان انیمیشن
     ----------------------------------------- */
 
     setTimeout(() => {
@@ -1387,11 +1433,6 @@ function finishGame() {
     clearTimer();
 
     state.gameActive = false;
-
-    /*
-     * فقط در صورتی که امتیاز دقیقاً ۷۰۰ باشد،
-     * انیمیشن ویژه اجرا می‌شود.
-     */
 
     if (state.score === 700) {
         showPerfectScoreAnimation();
