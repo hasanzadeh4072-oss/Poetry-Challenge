@@ -33,1438 +33,1202 @@ const state = {
     gameActive: false
 };
 
-const homeScreen = document.getElementById("homeScreen");
-const gameScreen = document.getElementById("gameScreen");
-const resultScreen = document.getElementById("resultScreen");
-
-const levelName = document.getElementById("levelName");
-const scoreElement = document.getElementById("score");
-const questionNumber = document.getElementById("questionNumber");
-const questionText = document.getElementById("questionText");
-const optionsContainer = document.getElementById("options");
-const timerElement = document.getElementById("timer");
-
-const resultLevel = document.getElementById("resultLevel");
-const finalScore = document.getElementById("finalScore");
-const resultMessage = document.getElementById("resultMessage");
-
-const stopButton = document.getElementById("stopButton");
-const restartButton = document.getElementById("restartButton");
-
-let confettiReady = false;
-let perfectStyleAdded = false;
-
-
-/* =========================================================
-تبدیل اعداد به فارسی
-========================================================= */
+const app = document.getElementById("app");
 
 function toPersianNumber(value) {
-    return String(value).replace(
-        /\d/g,
-        digit => "۰۱۲۳۴۵۶۷۸۹"[digit]
-    );
+    return String(value).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 }
 
-
-/* =========================================================
-نمایش صفحه
-========================================================= */
-
-function showScreen(screen) {
-    [homeScreen, gameScreen, resultScreen].forEach(item => {
-        item.classList.remove("active");
-    });
-
-    screen.classList.add("active");
+function showScreen(html) {
+    app.innerHTML = html;
 }
-
-
-/* =========================================================
-درهم‌ریختن آرایه
-========================================================= */
 
 function shuffle(array) {
     const result = [...array];
 
     for (let i = result.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-
-        [result[i], result[j]] =
-            [result[j], result[i]];
+        [result[i], result[j]] = [result[j], result[i]];
     }
 
     return result;
 }
 
-
-/* =========================================================
-دریافت کتابخانه کنفتی
-========================================================= */
-
-function loadConfettiLibrary() {
-
-    if (window.confetti) {
-        confettiReady = true;
-        return Promise.resolve();
-    }
-
-    if (
-        document.getElementById(
-            "hcg-confetti-library"
-        )
-    ) {
-        return new Promise(resolve => {
-
-            const check =
-                setInterval(() => {
-
-                    if (window.confetti) {
-                        clearInterval(check);
-                        confettiReady = true;
-                        resolve();
-                    }
-
-                }, 50);
-
-            setTimeout(() => {
-                clearInterval(check);
-                resolve();
-            }, 5000);
-
-        });
-    }
-
-    return new Promise(resolve => {
-
-        const script =
-            document.createElement("script");
-
-        script.id =
-            "hcg-confetti-library";
-
-        script.src =
-            "https://cdn.jsdelivr.net/npm/hcg-confetti-cannons@1/hcg-confetti-cannons.min.js";
-
-        script.onload = () => {
-            confettiReady = true;
-            resolve();
-        };
-
-        script.onerror = () => {
-            console.warn(
-                "Confetti library could not be loaded."
-            );
-
-            resolve();
-        };
-
-        document.head.appendChild(script);
-    });
-}
-
-
-/* =========================================================
-دریافت سؤال‌ها
-========================================================= */
-
 async function loadQuestions(level) {
-
-    const url = DATA_URLS[level];
-
-    if (!url) {
-        throw new Error("سطح نامعتبر است");
-    }
-
-    const response =
-        await fetch(
-            `${url}?v=${Date.now()}`,
-            {
-                cache: "no-store"
-            }
-        );
+    const response = await fetch(
+        `${DATA_URLS[level]}?v=${Date.now()}`,
+        {
+            cache: "no-store"
+        }
+    );
 
     if (!response.ok) {
-        throw new Error(
-            `خطا در دریافت سؤال‌ها: ${response.status}`
-        );
+        throw new Error("خطا در دریافت بانک سؤال");
     }
 
-    const data =
-        await response.json();
+    const data = await response.json();
 
     if (!Array.isArray(data)) {
-        throw new Error(
-            "ساختار فایل سؤال‌ها نامعتبر است"
-        );
+        throw new Error("ساختار بانک سؤال صحیح نیست");
     }
 
-    const selectedLevel =
-        LEVEL_NAMES[level];
+    const levelName = LEVEL_NAMES[level];
 
     return data.filter(question => {
-
-        if (
-            !question ||
-            !question["سؤال"] ||
-            !question["پاسخ صحیح"]
-        ) {
+        if (!question || !question["سؤال"] || !question["پاسخ صحیح"]) {
             return false;
         }
 
         if (question["سطح"]) {
-            return (
-                question["سطح"] ===
-                selectedLevel
-            );
+            return question["سطح"] === levelName;
         }
 
         return true;
     });
 }
 
-
-/* =========================================================
-ساخت گزینه‌ها
-========================================================= */
-
 function getOptions(question) {
+    let options = [];
 
-    let options =
-        question["گزینه‌ها"];
+    if (
+        Array.isArray(question["گزینه‌ها"]) &&
+        question["گزینه‌ها"].length >= 2
+    ) {
+        options = [...question["گزینه‌ها"]];
+    } else if (question["نوع سؤال"] === "صحیح/غلط") {
+        options = ["صحیح", "غلط"];
+    } else {
+        let others = question["سایر گزینه‌های چالشی"];
 
-    if (Array.isArray(options)) {
+        if (typeof others === "string") {
+            try {
+                others = JSON.parse(others);
+            } catch {
+                others = others
+                    .split(/[,،\n]/)
+                    .map(item => item.trim())
+                    .filter(Boolean);
+            }
+        }
 
-        options =
-            options.filter(option => {
-
-                return (
-                    option !== null &&
-                    option !== undefined &&
-                    String(option).trim() !== ""
-                );
-            });
-
-        if (options.length >= 2) {
-            return options;
+        if (Array.isArray(others)) {
+            options = [
+                question["پاسخ صحیح"],
+                ...others
+            ];
         }
     }
 
-    const correct =
-        question["پاسخ صحیح"];
+    options = options
+        .map(item => String(item).trim())
+        .filter(Boolean);
 
-    if (
-        question["نوع سؤال"] ===
-        "صحیح/غلط"
-    ) {
-        return [
-            "صحیح",
-            "غلط"
-        ];
-    }
+    options = [...new Set(options)];
 
-    let others =
-        question["سایر گزینه‌های چالشی"];
-
-    if (typeof others === "string") {
-
-        others =
-            others
-                .split(/[،,]/)
-                .map(option =>
-                    option.trim()
-                )
-                .filter(option => {
-
-                    return (
-                        option !== "" &&
-                        option !== "—" &&
-                        option !== "-"
-                    );
-                });
-
-    } else if (Array.isArray(others)) {
-
-        others =
-            others
-                .map(option =>
-                    String(option).trim()
-                )
-                .filter(option => {
-
-                    return (
-                        option !== "" &&
-                        option !== "—" &&
-                        option !== "-"
-                    );
-                });
-
-    } else {
-
-        others = [];
-    }
-
-    const allOptions = [
-        correct,
-        ...others
-    ];
-
-    const uniqueOptions = [
-        ...new Set(
-            allOptions.map(option =>
-                String(option).trim()
-            )
-        )
-    ];
-
-    return shuffle(uniqueOptions);
+    return shuffle(options);
 }
 
-
-/* =========================================================
-شروع بازی
-========================================================= */
-
-async function startGame(level) {
-
+function startGame(level) {
     clearTimer();
 
     state.level = level;
-
-    state.levelName =
-        LEVEL_NAMES[level] || level;
-
+    state.levelName = LEVEL_NAMES[level];
+    state.questions = [];
     state.currentQuestion = 0;
     state.score = 0;
     state.wrongAnswers = 0;
     state.correctAnswers = 0;
     state.unanswered = 0;
-    state.questions = [];
+    state.timeLeft = QUESTION_TIME;
+    state.answered = false;
     state.gameActive = false;
 
-    levelName.textContent =
-        state.levelName;
+    showScreen(`
+        <div class="loading-screen">
+            <div class="loading-spinner"></div>
+            <div>در حال آماده‌سازی چالش...</div>
+        </div>
+    `);
 
-    scoreElement.textContent =
-        toPersianNumber(0);
-
-    showScreen(gameScreen);
-
-    questionText.textContent =
-        "در حال آماده‌سازی چالش...";
-
-    optionsContainer.innerHTML = "";
-
-    try {
-
-        const allQuestions =
-            await loadQuestions(level);
-
-        if (
-            allQuestions.length <
-            QUESTION_COUNT
-        ) {
-            throw new Error(
-                `تعداد سؤال‌های سطح ${LEVEL_NAMES[level]} کافی نیست`
-            );
-        }
-
-        state.questions =
-            shuffle(allQuestions)
-                .slice(
-                    0,
-                    QUESTION_COUNT
-                )
-                .map(question => ({
-                    question,
-                    options:
-                        getOptions(question)
-                }));
-
-        for (
-            const item
-            of state.questions
-        ) {
-
-            if (
-                item.options.length < 2
-            ) {
+    loadQuestions(level)
+        .then(questions => {
+            if (questions.length < QUESTION_COUNT) {
                 throw new Error(
-                    "یکی از سؤال‌ها گزینه کافی ندارد"
+                    `برای این سطح حداقل ${QUESTION_COUNT} سؤال لازم است.`
                 );
             }
-        }
 
-        state.gameActive = true;
+            const selectedQuestions = shuffle(questions)
+                .slice(0, QUESTION_COUNT)
+                .map(question => ({
+                    ...question,
+                    _options: getOptions(question)
+                }));
 
-        showQuestion();
+            for (const question of selectedQuestions) {
+                if (question._options.length < 2) {
+                    throw new Error(
+                        "برخی از سؤال‌ها گزینه‌های کافی ندارند."
+                    );
+                }
+            }
 
-    } catch (error) {
+            state.questions = selectedQuestions;
+            state.gameActive = true;
 
-        console.error(
-            "START GAME ERROR:",
-            error
-        );
+            showQuestion();
+        })
+        .catch(error => {
+            showScreen(`
+                <div class="error-screen">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-title">خطا</div>
+                    <div class="error-message">
+                        ${error.message}
+                    </div>
+                    <button class="primary-btn" id="back-home">
+                        بازگشت
+                    </button>
+                </div>
+            `);
 
-        state.gameActive = false;
-
-        questionText.textContent =
-            "دریافت سؤال‌ها با مشکل مواجه شد.";
-
-        optionsContainer.innerHTML = "";
-
-        const retryButton =
-            document.createElement(
-                "button"
-            );
-
-        retryButton.className =
-            "primary-btn";
-
-        retryButton.textContent =
-            "🔄 تلاش دوباره";
-
-        retryButton.addEventListener(
-            "click",
-            () => startGame(level)
-        );
-
-        optionsContainer.appendChild(
-            retryButton
-        );
-    }
+            document
+                .getElementById("back-home")
+                ?.addEventListener("click", showHomeScreen);
+        });
 }
 
-
-/* =========================================================
-نمایش سؤال
-========================================================= */
-
 function showQuestion() {
-
     clearTimer();
 
-    if (!state.gameActive) {
-        return;
-    }
+    const question =
+        state.questions[state.currentQuestion];
 
-    if (
-        state.currentQuestion >=
-        state.questions.length
-    ) {
+    if (!question) {
         finishGame();
         return;
     }
 
-    const item =
-        state.questions[
-            state.currentQuestion
-        ];
-
-    const question =
-        item.question;
-
     state.answered = false;
+    state.timeLeft = QUESTION_TIME;
 
-    state.timeLeft =
-        QUESTION_TIME;
+    const options = shuffle(question._options);
 
-    questionNumber.textContent =
-        toPersianNumber(
-            state.currentQuestion + 1
-        );
+    showScreen(`
+        <div class="game-screen">
 
-    questionText.textContent =
-        question["سؤال"];
+            <div class="game-header">
+                <div class="level-badge">
+                    ${state.levelName}
+                </div>
 
-    optionsContainer.innerHTML = "";
+                <div class="question-counter">
+                    سؤال ${toPersianNumber(state.currentQuestion + 1)}
+                    از
+                    ${toPersianNumber(QUESTION_COUNT)}
+                </div>
+            </div>
 
-    const options =
-        shuffle(item.options);
+            <div class="score-row">
+                <div>
+                    امتیاز:
+                    <strong id="score-value">
+                        ${toPersianNumber(state.score)}
+                    </strong>
+                </div>
 
-    options.forEach(option => {
+                <div class="timer" id="timer">
+                    ${toPersianNumber(state.timeLeft)}
+                </div>
+            </div>
 
-        const button =
-            document.createElement(
-                "button"
-            );
+            <div class="question-card">
+                <div class="question-text">
+                    ${question["سؤال"]}
+                </div>
+            </div>
 
-        button.className =
-            "option-btn";
+            <div class="options-container" id="options-container">
+                ${options.map((option, index) => `
+                    <button
+                        class="option-btn"
+                        data-option="${encodeURIComponent(option)}"
+                    >
+                        <span class="option-letter">
+                            ${"الفبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی"[index] || ""}
+                        </span>
+                        <span class="option-text">
+                            ${option}
+                        </span>
+                    </button>
+                `).join("")}
+            </div>
 
-        button.type = "button";
+            <button class="stop-btn" id="stop-game">
+                ⛔ توقف چالش
+            </button>
 
-        button.textContent =
-            String(option);
+        </div>
+    `);
 
-        button.addEventListener(
-            "click",
-            () => {
-
-                answerQuestion(
-                    option,
-                    button
+    document
+        .querySelectorAll(".option-btn")
+        .forEach(button => {
+            button.addEventListener("click", () => {
+                const option = decodeURIComponent(
+                    button.dataset.option
                 );
-            }
-        );
 
-        optionsContainer.appendChild(
-            button
-        );
-    });
+                answerQuestion(option, button);
+            });
+        });
+
+    document
+        .getElementById("stop-game")
+        ?.addEventListener("click", stopGame);
+
+    startTimer();
+}
+
+function startTimer() {
+    clearTimer();
+
+    state.timeLeft = QUESTION_TIME;
 
     updateTimer();
 
-    state.timer =
-        setInterval(() => {
+    state.timer = setInterval(() => {
+        if (!state.gameActive || state.answered) {
+            return;
+        }
 
-            if (!state.gameActive) {
+        state.timeLeft--;
 
-                clearTimer();
+        updateTimer();
 
-                return;
-            }
-
-            state.timeLeft--;
-
-            updateTimer();
-
-            if (
-                state.timeLeft <= 0
-            ) {
-
-                clearTimer();
-
-                timeExpired();
-            }
-
-        }, 1000);
+        if (state.timeLeft <= 0) {
+            timeExpired();
+        }
+    }, 1000);
 }
-
-
-/* =========================================================
-تایمر
-========================================================= */
 
 function updateTimer() {
+    const timer = document.getElementById("timer");
 
-    const minutes =
-        Math.floor(
-            state.timeLeft / 60
-        );
+    if (!timer) {
+        return;
+    }
 
-    const seconds =
-        state.timeLeft % 60;
-
-    timerElement.textContent =
-        `${toPersianNumber(minutes)}:${toPersianNumber(
-            String(seconds).padStart(2, "0")
-        )}`;
-
-    timerElement.classList.remove(
-        "warning",
-        "danger"
+    timer.textContent = toPersianNumber(
+        Math.max(0, state.timeLeft)
     );
 
-    if (
+    timer.classList.toggle(
+        "danger",
         state.timeLeft <= 10
-    ) {
-
-        timerElement.classList.add(
-            "danger"
-        );
-
-    } else if (
-        state.timeLeft <= 30
-    ) {
-
-        timerElement.classList.add(
-            "warning"
-        );
-    }
+    );
 }
 
-
-/* =========================================================
-نرمال‌سازی متن
-========================================================= */
-
-function normalizeText(value) {
-
-    return String(value ?? "")
+function normalizeText(text) {
+    return String(text ?? "")
         .trim()
         .replace(/ي/g, "ی")
-        .replace(/ك/g, "ک");
+        .replace(/ى/g, "ی")
+        .replace(/ك/g, "ک")
+        .replace(/ۀ/g, "ه")
+        .replace(/ة/g, "ه")
+        .replace(/\u200c/g, " ")
+        .replace(/\s+/g, " ");
 }
-
-
-/* =========================================================
-پاسخ صحیح
-========================================================= */
 
 function getCorrectAnswer(question) {
+    return normalizeText(question["پاسخ صحیح"]);
+}
 
+function isCorrect(option, question) {
     return (
-        question["پاسخ صحیح"] ||
-        ""
+        normalizeText(option) ===
+        getCorrectAnswer(question)
     );
 }
 
-
-/* =========================================================
-بررسی پاسخ
-========================================================= */
-
-function isCorrect(
-    selectedAnswer,
-    question
-) {
-
-    return (
-        normalizeText(
-            selectedAnswer
-        ) ===
-        normalizeText(
-            getCorrectAnswer(question)
-        )
-    );
-}
-
-
-/* =========================================================
-پاسخ به سؤال
-========================================================= */
-
-function answerQuestion(
-    selectedAnswer,
-    selectedButton
-) {
-
-    if (
-        !state.gameActive ||
-        state.answered
-    ) {
+function answerQuestion(option, clickedButton) {
+    if (!state.gameActive || state.answered) {
         return;
     }
 
     state.answered = true;
-
     clearTimer();
 
-    const item =
-        state.questions[
-            state.currentQuestion
-        ];
-
     const question =
-        item.question;
+        state.questions[state.currentQuestion];
 
-    const correct =
-        isCorrect(
-            selectedAnswer,
-            question
-        );
+    document
+        .querySelectorAll(".option-btn")
+        .forEach(button => {
+            button.disabled = true;
+        });
 
-    const buttons =
-        optionsContainer.querySelectorAll(
-            ".option-btn"
-        );
-
-    buttons.forEach(button => {
-        button.disabled = true;
-    });
-
-    if (correct) {
-
+    if (isCorrect(option, question)) {
+        state.correctAnswers++;
         state.score += 100;
 
-        state.correctAnswers++;
-
-        selectedButton.classList.add(
-            "correct"
-        );
-
+        clickedButton.classList.add("correct");
     } else {
-
         state.wrongAnswers++;
 
-        selectedButton.classList.add(
-            "wrong"
-        );
-
-        if (
-            state.wrongAnswers % 2 === 0
-        ) {
+        if (state.wrongAnswers % 2 === 0) {
             state.score -= 15;
         }
 
-        const correctAnswer =
-            getCorrectAnswer(question);
+        clickedButton.classList.add("wrong");
 
-        buttons.forEach(button => {
-
-            if (
-                normalizeText(
-                    button.textContent
-                ) ===
-                normalizeText(
-                    correctAnswer
-                )
-            ) {
-
-                button.classList.add(
-                    "correct"
+        document
+            .querySelectorAll(".option-btn")
+            .forEach(button => {
+                const value = decodeURIComponent(
+                    button.dataset.option
                 );
-            }
-        });
+
+                if (isCorrect(value, question)) {
+                    button.classList.add("correct");
+                }
+            });
     }
 
-    scoreElement.textContent =
-        toPersianNumber(
-            state.score
-        );
+    const scoreValue =
+        document.getElementById("score-value");
+
+    if (scoreValue) {
+        scoreValue.textContent =
+            toPersianNumber(state.score);
+    }
 
     setTimeout(() => {
         nextQuestion();
     }, 700);
 }
 
-
-/* =========================================================
-پایان زمان سؤال
-========================================================= */
-
 function timeExpired() {
-
-    if (
-        !state.gameActive ||
-        state.answered
-    ) {
+    if (!state.gameActive || state.answered) {
         return;
     }
 
     state.answered = true;
-
     state.unanswered++;
 
-    const buttons =
-        optionsContainer.querySelectorAll(
-            ".option-btn"
-        );
+    clearTimer();
 
-    buttons.forEach(button => {
-        button.disabled = true;
-    });
+    document
+        .querySelectorAll(".option-btn")
+        .forEach(button => {
+            button.disabled = true;
+        });
 
     setTimeout(() => {
         nextQuestion();
     }, 500);
 }
 
-
-/* =========================================================
-سؤال بعدی
-========================================================= */
-
 function nextQuestion() {
-
     if (!state.gameActive) {
         return;
     }
 
     state.currentQuestion++;
 
-    if (
-        state.currentQuestion >=
-        state.questions.length
-    ) {
-
+    if (state.currentQuestion >= QUESTION_COUNT) {
         finishGame();
-
-    } else {
-
-        showQuestion();
+        return;
     }
+
+    showQuestion();
 }
 
-
-/* =========================================================
-پاک کردن تایمر
-========================================================= */
-
 function clearTimer() {
-
-    if (state.timer !== null) {
-
-        clearInterval(
-            state.timer
-        );
-
+    if (state.timer) {
+        clearInterval(state.timer);
         state.timer = null;
     }
 }
 
-
 /* =========================================================
-استایل انیمیشن امتیاز کامل
-========================================================= */
-
-function addPerfectAnimationStyles() {
-
-    if (perfectStyleAdded) {
-        return;
-    }
-
-    const style =
-        document.createElement(
-            "style"
-        );
-
-    style.id =
-        "perfect-score-style";
-
-    style.textContent = `
-
-        .perfect-screen {
-            position: fixed !important;
-            inset: 0 !important;
-
-            width: 100vw !important;
-            height: 100vh !important;
-
-            z-index: 2147483647 !important;
-
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-
-            overflow: hidden !important;
-
-            background:
-                linear-gradient(
-                    180deg,
-                    #111827 0%,
-                    #0b1020 100%
-                ) !important;
-
-            box-sizing: border-box !important;
-        }
-
-        .perfect-box {
-            position: relative !important;
-
-            z-index: 20 !important;
-
-            width: 100% !important;
-
-            display: flex !important;
-            flex-direction: column !important;
-
-            align-items: center !important;
-            justify-content: center !important;
-
-            text-align: center !important;
-        }
-
-        .perfect-trophy {
-            font-size: 100px !important;
-
-            line-height: 1 !important;
-
-            margin-bottom: 20px !important;
-
-            opacity: 0 !important;
-
-            transform:
-                scale(.2)
-                translateY(40px) !important;
-
-            filter:
-                drop-shadow(
-                    0 0 12px
-                    rgba(255,193,7,.9)
-                )
-                drop-shadow(
-                    0 0 35px
-                    rgba(255,193,7,.6)
-                ) !important;
-
-            animation:
-                trophyAppear
-                .9s
-                cubic-bezier(.17,.89,.32,1.28)
-                forwards !important;
-        }
-
-        .perfect-number {
-            font-size: 86px !important;
-
-            font-weight: 900 !important;
-
-            line-height: 1 !important;
-
-            color: #ffd54f !important;
-
-            text-shadow:
-                0 0 12px
-                rgba(255,193,7,.9),
-                0 0 30px
-                rgba(255,193,7,.6) !important;
-
-            opacity: 0 !important;
-
-            animation:
-                numberAppear
-                .8s
-                ease
-                .5s
-                forwards !important;
-        }
-
-        .perfect-title {
-            margin-top: 22px !important;
-
-            font-size: 27px !important;
-
-            font-weight: 900 !important;
-
-            color: #ffffff !important;
-
-            opacity: 0 !important;
-
-            animation:
-                textAppear
-                .7s
-                ease
-                1.1s
-                forwards !important;
-        }
-
-        .perfect-subtitle {
-            margin-top: 10px !important;
-
-            padding: 0 20px !important;
-
-            font-size: 16px !important;
-
-            color:
-                rgba(255,255,255,.75) !important;
-
-            opacity: 0 !important;
-
-            animation:
-                textAppear
-                .7s
-                ease
-                1.4s
-                forwards !important;
-        }
-
-        @keyframes trophyAppear {
-
-            0% {
-                opacity: 0;
-                transform:
-                    scale(.2)
-                    translateY(60px);
-            }
-
-            70% {
-                opacity: 1;
-                transform:
-                    scale(1.12)
-                    translateY(-5px);
-            }
-
-            100% {
-                opacity: 1;
-                transform:
-                    scale(1)
-                    translateY(0);
-            }
-        }
-
-        @keyframes numberAppear {
-
-            0% {
-                opacity: 0;
-                transform: scale(.2);
-            }
-
-            70% {
-                opacity: 1;
-                transform: scale(1.12);
-            }
-
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        @keyframes textAppear {
-
-            from {
-                opacity: 0;
-                transform:
-                    translateY(18px);
-            }
-
-            to {
-                opacity: 1;
-                transform:
-                    translateY(0);
-            }
-        }
-
-    `;
-
-    document.head.appendChild(
-        style
-    );
-
-    perfectStyleAdded = true;
-}
-
-
-/* =========================================================
-اجرای انیمیشن امتیاز کامل
-========================================================= */
-
-async function showPerfectScoreAnimation() {
-
-    addPerfectAnimationStyles();
-
-    const old =
-        document.querySelector(
-            ".perfect-screen"
-        );
-
-    if (old) {
-        old.remove();
-    }
-
-
-    /* -----------------------------------------
-       ساخت صفحه جشن
-    ----------------------------------------- */
-
-    const overlay =
-        document.createElement(
-            "div"
-        );
-
-    overlay.className =
-        "perfect-screen";
-
-
-    const box =
-        document.createElement(
-            "div"
-        );
-
-    box.className =
-        "perfect-box";
-
-
-    const trophy =
-        document.createElement(
-            "div"
-        );
-
-    trophy.className =
-        "perfect-trophy";
-
-    trophy.textContent =
-        "🏆";
-
-
-    const number =
-        document.createElement(
-            "div"
-        );
-
-    number.className =
-        "perfect-number";
-
-    number.textContent =
-        "۰";
-
-
-    const title =
-        document.createElement(
-            "div"
-        );
-
-    title.className =
-        "perfect-title";
-
-    title.textContent =
-        "✨ امتیاز کامل! ✨";
-
-
-    const subtitle =
-        document.createElement(
-            "div"
-        );
-
-    subtitle.className =
-        "perfect-subtitle";
-
-    subtitle.textContent =
-        "هر ۷ سؤال را درست پاسخ دادید";
-
-
-    box.appendChild(
-        trophy
-    );
-
-    box.appendChild(
-        number
-    );
-
-    box.appendChild(
-        title
-    );
-
-    box.appendChild(
-        subtitle
-    );
-
-    overlay.appendChild(
-        box
-    );
-
-    document.body.appendChild(
-        overlay
-    );
-
-
-    /* -----------------------------------------
-       بارگذاری کتابخانه
-    ----------------------------------------- */
-
-    await loadConfettiLibrary();
-
-
-    /* -----------------------------------------
-       کنفتی آماده
-    ----------------------------------------- */
-
-    if (
-        confettiReady &&
-        typeof window.confetti ===
-        "function"
-    ) {
-
-        setTimeout(() => {
-
-            try {
-
-                window.confetti.celebrate({
-                    particleCount: 180
-                });
-
-            } catch (error) {
-
-                console.warn(
-                    "Confetti error:",
-                    error
-                );
-
-                try {
-                    window.confetti({
-                        particleCount: 180,
-                        spread: 100,
-                        origin: {
-                            x: 0.5,
-                            y: 0.65
-                        }
-                    });
-                } catch (_) {}
-            }
-
-        }, 250);
-
-
-        setTimeout(() => {
-
-            try {
-
-                window.confetti.fireworks({
-                    duration: 1800,
-                    interval: 300
-                });
-
-            } catch (_) {}
-
-        }, 900);
-
-    }
-
-
-    /* -----------------------------------------
-       شمارش ۰ تا ۷۰۰
-    ----------------------------------------- */
-
-    const duration =
-        1500;
-
-    const start =
-        performance.now();
-
-    function animateScore(now) {
-
-        if (
-            !overlay.parentNode
-        ) {
+   PERFECT SCORE — READY-MADE LOTTIE ANIMATION
+   ========================================================= */
+
+function loadLottiePlayer() {
+    return new Promise(resolve => {
+        if (window.customElements?.get("lottie-player")) {
+            resolve(true);
             return;
         }
 
-        const progress =
-            Math.min(
-                (now - start) /
-                duration,
-                1
+        const existing =
+            document.querySelector(
+                'script[data-lottie-player="true"]'
             );
 
-        const eased =
-            1 -
-            Math.pow(
-                1 - progress,
-                3
+        if (existing) {
+            existing.addEventListener(
+                "load",
+                () => resolve(true),
+                { once: true }
             );
 
-        const value =
-            Math.floor(
-                700 * eased
+            existing.addEventListener(
+                "error",
+                () => resolve(false),
+                { once: true }
             );
 
-        number.textContent =
-            toPersianNumber(
-                value
-            );
-
-        if (
-            progress < 1
-        ) {
-
-            requestAnimationFrame(
-                animateScore
-            );
-
-        } else {
-
-            number.textContent =
-                "۷۰۰";
+            return;
         }
-    }
 
-    requestAnimationFrame(
-        animateScore
-    );
+        const script = document.createElement("script");
 
+        script.src =
+            "https://unpkg.com/@lottiefiles/lottie-player@2.0.12/dist/lottie-player.js";
 
-    /* -----------------------------------------
-       پایان
-    ----------------------------------------- */
+        script.dataset.lottiePlayer = "true";
+
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+
+        document.head.appendChild(script);
+    });
+}
+
+function showPerfectScoreAnimation() {
+    clearTimer();
+
+    const overlay =
+        document.createElement("div");
+
+    overlay.id = "perfect-score-overlay";
+
+    overlay.innerHTML = `
+        <div class="perfect-score-content">
+
+            <lottie-player
+                id="perfect-lottie"
+                src="https://lottie.host/6c0d4d1f-4b6f-4e0e-9e20-7c7f1e1e4e0f/5fM3JfQ9uT.json"
+                background="transparent"
+                speed="1"
+                loop="false"
+                autoplay
+            ></lottie-player>
+
+            <div class="perfect-score-title">
+                ✨ امتیاز کامل! ✨
+            </div>
+
+            <div class="perfect-score-number">
+                ۷۰۰
+            </div>
+
+            <div class="perfect-score-subtitle">
+                هر ۷ سؤال را درست پاسخ دادی! 🏆
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    loadLottiePlayer();
 
     setTimeout(() => {
+        overlay.classList.add("hide");
 
-        if (
-            overlay &&
-            overlay.parentNode
-        ) {
+        setTimeout(() => {
             overlay.remove();
-        }
-
-        if (window.confetti) {
-
-            try {
-                window.confetti.reset();
-            } catch (_) {}
-        }
-
-        showResultScreen();
-
+            showResultScreen();
+        }, 500);
     }, 5000);
 }
 
-
-/* =========================================================
-نمایش نتیجه نهایی
-========================================================= */
-
 function showResultScreen() {
+    let resultMessage = "";
 
-    resultLevel.textContent =
-        state.levelName;
-
-    finalScore.textContent =
-        toPersianNumber(
-            state.score
-        );
-
-    let message;
-
-    if (
-        state.score >= 600
-    ) {
-
-        message =
-            "فوق‌العاده! 🌟";
-
-    } else if (
-        state.score >= 400
-    ) {
-
-        message =
-            "عالی! 👏";
-
-    } else if (
-        state.score >= 200
-    ) {
-
-        message =
-            "خوب بود! 🌿";
-
+    if (state.score >= 600) {
+        resultMessage = "فوق‌العاده! 🌟";
+    } else if (state.score >= 400) {
+        resultMessage = "عالی! 👏";
+    } else if (state.score >= 200) {
+        resultMessage = "خوب بود! 🌿";
     } else {
-
-        message =
+        resultMessage =
             "این پایان راه نیست؛ دوباره تلاش کن. 💚";
     }
 
-    resultMessage.textContent =
-        message;
+    showScreen(`
+        <div class="result-screen">
 
-    showScreen(
-        resultScreen
-    );
+            <div class="result-icon">
+                🏆
+            </div>
+
+            <div class="result-title">
+                پایان چالش
+            </div>
+
+            <div class="result-level">
+                سطح ${state.levelName}
+            </div>
+
+            <div class="result-score">
+                ${toPersianNumber(state.score)}
+            </div>
+
+            <div class="result-message">
+                ${resultMessage}
+            </div>
+
+            <div class="result-stats">
+
+                <div class="result-stat">
+                    <span>پاسخ صحیح</span>
+                    <strong>
+                        ${toPersianNumber(state.correctAnswers)}
+                    </strong>
+                </div>
+
+                <div class="result-stat">
+                    <span>پاسخ غلط</span>
+                    <strong>
+                        ${toPersianNumber(state.wrongAnswers)}
+                    </strong>
+                </div>
+
+                <div class="result-stat">
+                    <span>بدون پاسخ</span>
+                    <strong>
+                        ${toPersianNumber(state.unanswered)}
+                    </strong>
+                </div>
+
+            </div>
+
+            <button class="primary-btn" id="play-again">
+                🔄 دوباره بازی کن
+            </button>
+
+            <button class="secondary-btn" id="result-home">
+                🏠 بازگشت
+            </button>
+
+        </div>
+    `);
+
+    document
+        .getElementById("play-again")
+        ?.addEventListener("click", () => {
+            startGame(state.level);
+        });
+
+    document
+        .getElementById("result-home")
+        ?.addEventListener("click", showHomeScreen);
 }
 
-
-/* =========================================================
-پایان بازی
-========================================================= */
-
 function finishGame() {
-
     clearTimer();
 
     state.gameActive = false;
 
-    if (
-        state.score === 700
-    ) {
-
+    if (state.score === 700) {
         showPerfectScoreAnimation();
-
         return;
     }
 
     showResultScreen();
 }
 
-
-/* =========================================================
-توقف بازی
-========================================================= */
-
 function stopGame() {
+    clearTimer();
 
+    state.gameActive = false;
+    state.answered = true;
+
+    showHomeScreen();
+}
+
+function showHomeScreen() {
     clearTimer();
 
     state.gameActive = false;
 
-    showScreen(
-        homeScreen
-    );
+    showScreen(`
+        <div class="home-screen">
+
+            <div class="home-logo">
+                📚
+            </div>
+
+            <div class="home-title">
+                چالش شعرانه
+            </div>
+
+            <div class="home-description">
+                دانسته‌های ادبی و شعری خودت را در
+                سه سطح بیازما!
+            </div>
+
+            <button class="primary-btn" id="start-challenge">
+                شروع چالش
+            </button>
+
+            <div class="home-menu">
+
+                <button class="menu-btn">
+                    💬 ارتباط با مدیر
+                </button>
+
+                <button class="menu-btn">
+                    🌿 درباره ما
+                </button>
+
+                <button class="menu-btn">
+                    🤖 سایر بات‌ها
+                </button>
+
+            </div>
+
+        </div>
+    `);
+
+    document
+        .getElementById("start-challenge")
+        ?.addEventListener(
+            "click",
+            showLevelScreen
+        );
 }
 
+function showLevelScreen() {
+    showScreen(`
+        <div class="level-screen">
 
-/* =========================================================
-انتخاب سطح
-========================================================= */
+            <div class="level-title">
+                انتخاب سطح
+            </div>
 
-document
-    .querySelectorAll(".level-btn")
-    .forEach(button => {
+            <div class="level-description">
+                سطح موردنظر خود را انتخاب کنید
+            </div>
 
-        button.addEventListener(
-            "click",
-            () => {
+            <div class="levels">
 
-                const level =
-                    button.dataset.level;
+                <button
+                    class="level-btn"
+                    data-level="ashenaei"
+                >
+                    <span>🌱</span>
+                    <strong>آشنایی</strong>
+                    <small>سطح مقدماتی</small>
+                </button>
 
-                if (level) {
-                    startGame(level);
-                }
-            }
-        );
-    });
+                <button
+                    class="level-btn"
+                    data-level="danaei"
+                >
+                    <span>📖</span>
+                    <strong>دانایی</strong>
+                    <small>سطح متوسط</small>
+                </button>
 
+                <button
+                    class="level-btn"
+                    data-level="ostad"
+                >
+                    <span>🎓</span>
+                    <strong>استادی</strong>
+                    <small>سطح پیشرفته</small>
+                </button>
 
-/* =========================================================
-دکمه توقف
-========================================================= */
+            </div>
 
-stopButton.addEventListener(
-    "click",
-    stopGame
-);
+            <button class="secondary-btn" id="level-back">
+                بازگشت
+            </button>
 
+        </div>
+    `);
 
-/* =========================================================
-دکمه شروع مجدد
-========================================================= */
+    document
+        .querySelectorAll(".level-btn")
+        .forEach(button => {
+            button.addEventListener("click", () => {
+                startGame(button.dataset.level);
+            });
+        });
 
-restartButton.addEventListener(
-    "click",
-    () => {
-        showScreen(homeScreen);
-    }
-);
+    document
+        .getElementById("level-back")
+        ?.addEventListener("click", showHomeScreen);
+}
 
+function injectStyles() {
+    const style = document.createElement("style");
 
-/* =========================================================
-راه‌اندازی برنامک سروش
-========================================================= */
+    style.textContent = `
+        * {
+            box-sizing: border-box;
+        }
 
-function initializeSoroushWebApp() {
+        body {
+            margin: 0;
+            padding: 0;
+            font-family:
+                Vazirmatn,
+                Tahoma,
+                Arial,
+                sans-serif;
+            direction: rtl;
+            background: #f7f7f7;
+            color: #222;
+        }
 
-    try {
+        button {
+            font-family: inherit;
+        }
 
-        if (
-            window.Soroush &&
-            window.Soroush.WebApp
-        ) {
+        .home-screen,
+        .level-screen,
+        .game-screen,
+        .result-screen,
+        .error-screen,
+        .loading-screen {
+            min-height: 100vh;
+            padding: 24px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
 
-            const webApp =
-                window.Soroush.WebApp;
+        .home-logo {
+            font-size: 64px;
+            margin-bottom: 12px;
+        }
 
-            if (
-                typeof webApp.ready ===
-                "function"
-            ) {
-                webApp.ready();
-            }
+        .home-title {
+            font-size: 30px;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
 
-            if (
-                typeof webApp.expand ===
-                "function"
-            ) {
-                webApp.expand();
+        .home-description {
+            max-width: 420px;
+            text-align: center;
+            line-height: 2;
+            color: #666;
+            margin-bottom: 28px;
+        }
+
+        .primary-btn,
+        .secondary-btn,
+        .menu-btn,
+        .stop-btn,
+        .level-btn {
+            border: 0;
+            cursor: pointer;
+            transition: .2s ease;
+        }
+
+        .primary-btn {
+            width: min(100%, 360px);
+            padding: 15px 22px;
+            border-radius: 16px;
+            background: #222;
+            color: #fff;
+            font-size: 17px;
+            font-weight: 800;
+        }
+
+        .secondary-btn {
+            width: min(100%, 360px);
+            margin-top: 12px;
+            padding: 13px 20px;
+            border-radius: 15px;
+            background: #e9e9e9;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .home-menu {
+            width: min(100%, 360px);
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .menu-btn {
+            padding: 13px;
+            border-radius: 14px;
+            background: #fff;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .level-title {
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+
+        .level-description {
+            color: #777;
+            margin-bottom: 25px;
+        }
+
+        .levels {
+            width: min(100%, 420px);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .level-btn {
+            width: 100%;
+            padding: 18px;
+            border-radius: 18px;
+            background: #fff;
+            display: grid;
+            grid-template-columns: 45px 1fr;
+            grid-template-rows: auto auto;
+            text-align: right;
+            box-shadow: 0 3px 14px rgba(0,0,0,.06);
+        }
+
+        .level-btn span {
+            grid-row: 1 / 3;
+            font-size: 30px;
+            align-self: center;
+        }
+
+        .level-btn strong {
+            font-size: 18px;
+        }
+
+        .level-btn small {
+            margin-top: 5px;
+            color: #888;
+        }
+
+        .game-screen {
+            justify-content: flex-start;
+            padding-top: 20px;
+        }
+
+        .game-header,
+        .score-row {
+            width: min(100%, 600px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .game-header {
+            margin-bottom: 15px;
+        }
+
+        .level-badge {
+            background: #222;
+            color: #fff;
+            padding: 7px 13px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .question-counter {
+            color: #777;
+            font-size: 14px;
+        }
+
+        .score-row {
+            margin-bottom: 18px;
+            color: #555;
+        }
+
+        .score-row strong {
+            color: #111;
+        }
+
+        .timer {
+            min-width: 48px;
+            text-align: center;
+            padding: 7px 10px;
+            border-radius: 10px;
+            background: #fff;
+            font-weight: 900;
+        }
+
+        .timer.danger {
+            background: #ffe7e7;
+            color: #c00;
+        }
+
+        .question-card {
+            width: min(100%, 600px);
+            padding: 24px 20px;
+            border-radius: 20px;
+            background: #fff;
+            box-shadow: 0 4px 18px rgba(0,0,0,.06);
+            margin-bottom: 18px;
+        }
+
+        .question-text {
+            font-size: 19px;
+            line-height: 2;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .options-container {
+            width: min(100%, 600px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-btn {
+            width: 100%;
+            border: 2px solid #e7e7e7;
+            background: #fff;
+            border-radius: 16px;
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: right;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1.8;
+        }
+
+        .option-btn:disabled {
+            cursor: default;
+        }
+
+        .option-letter {
+            width: 32px;
+            height: 32px;
+            flex: 0 0 32px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+        }
+
+        .option-btn.correct {
+            border-color: #39a95c;
+            background: #eaf8ee;
+        }
+
+        .option-btn.wrong {
+            border-color: #dc4c4c;
+            background: #fff0f0;
+        }
+
+        .stop-btn {
+            margin-top: 18px;
+            padding: 10px 18px;
+            border-radius: 12px;
+            background: transparent;
+            color: #888;
+            font-size: 13px;
+        }
+
+        .result-icon {
+            font-size: 64px;
+            margin-bottom: 10px;
+        }
+
+        .result-title {
+            font-size: 28px;
+            font-weight: 900;
+        }
+
+        .result-level {
+            color: #777;
+            margin-top: 8px;
+        }
+
+        .result-score {
+            font-size: 58px;
+            font-weight: 1000;
+            margin: 18px 0 5px;
+        }
+
+        .result-message {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 25px;
+        }
+
+        .result-stats {
+            width: min(100%, 420px);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 25px;
+        }
+
+        .result-stat {
+            background: #fff;
+            border-radius: 14px;
+            padding: 12px 5px;
+            text-align: center;
+        }
+
+        .result-stat span {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .result-stat strong {
+            font-size: 18px;
+        }
+
+        .error-icon {
+            font-size: 50px;
+        }
+
+        .error-title {
+            font-size: 25px;
+            font-weight: 900;
+            margin: 12px 0;
+        }
+
+        .error-message {
+            text-align: center;
+            color: #777;
+            margin-bottom: 20px;
+        }
+
+        .loading-spinner {
+            width: 42px;
+            height: 42px;
+            border: 4px solid #ddd;
+            border-top-color: #222;
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
             }
         }
 
-    } catch (error) {
+        /* فقط ظاهر ساده برای افکت آماده Lottie */
+        #perfect-score-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+            background: rgba(10, 10, 18, .97);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity .5s ease;
+        }
 
-        console.error(
-            "Soroush WebApp initialization error:",
+        #perfect-score-overlay.hide {
+            opacity: 0;
+        }
+
+        .perfect-score-content {
+            width: min(92vw, 420px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        #perfect-lottie {
+            width: min(78vw, 330px);
+            height: min(78vw, 330px);
+            margin-bottom: -25px;
+        }
+
+        .perfect-score-title {
+            color: #fff;
+            font-size: 25px;
+            font-weight: 900;
+            margin-top: 0;
+        }
+
+        .perfect-score-number {
+            color: #fff;
+            font-size: 58px;
+            line-height: 1.1;
+            font-weight: 1000;
+            margin-top: 8px;
+        }
+
+        .perfect-score-subtitle {
+            color: rgba(255,255,255,.78);
+            font-size: 15px;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 420px) {
+            .question-text {
+                font-size: 17px;
+            }
+
+            .result-score {
+                font-size: 50px;
+            }
+
+            .perfect-score-title {
+                font-size: 22px;
+            }
+
+            .perfect-score-number {
+                font-size: 50px;
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+function initializeSoroushWebApp() {
+    injectStyles();
+    showHomeScreen();
+
+    try {
+        if (
+            window.SoroushWebApp &&
+            typeof window.SoroushWebApp.ready === "function"
+        ) {
+            window.SoroushWebApp.ready();
+        }
+    } catch (error) {
+        console.warn(
+            "Soroush WebApp initialization warning:",
             error
         );
     }
 }
 
-initializeSoroushWebApp();
+if (document.readyState === "loading") {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeSoroushWebApp
+    );
+} else {
+    initializeSoroushWebApp();
+}
+```0
