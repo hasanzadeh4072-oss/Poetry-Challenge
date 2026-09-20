@@ -4,9 +4,9 @@ const QUESTION_COUNT = 7;
 const QUESTION_TIME = 90;
 
 const DATA_URLS = {
-    ashenaei: "../ashenaei.json",
-    danaei: "../danaei.json",
-    ostad: "../Ostad.json"
+    ashenaei: "./ashenaei.json",
+    danaei: "./danaei.json",
+    ostad: "./Ostad.json"
 };
 
 const LEVEL_NAMES = {
@@ -70,6 +70,110 @@ function shuffle(array) {
     return result;
 }
 
+function buildOptions(question) {
+    const questionType = String(
+        question["نوع سؤال"] || ""
+    ).trim();
+
+    if (
+        questionType === "صحیح/غلط" ||
+        questionType === "صحیح یا غلط" ||
+        questionType === "درست/غلط" ||
+        questionType === "درست یا غلط" ||
+        questionType === "صحیح-غلط"
+    ) {
+        return ["صحیح", "غلط"];
+    }
+
+    const existingOptions =
+        question["گزینه‌ها"] ||
+        question.options;
+
+    if (Array.isArray(existingOptions)) {
+        const cleanOptions = [];
+
+        existingOptions.forEach(option => {
+            if (option === null || option === undefined) {
+                return;
+            }
+
+            const value =
+                typeof option === "object"
+                    ? (
+                        option.text ||
+                        option["متن"] ||
+                        option.answer ||
+                        option["پاسخ"] ||
+                        ""
+                    )
+                    : option;
+
+            const text = String(value).trim();
+
+            if (
+                text &&
+                !["-", "—", "–"].includes(text) &&
+                !cleanOptions.includes(text)
+            ) {
+                cleanOptions.push(text);
+            }
+        });
+
+        if (cleanOptions.length >= 2) {
+            return cleanOptions;
+        }
+    }
+
+    const correctAnswer =
+        question["پاسخ صحیح"] ??
+        question.correct_answer ??
+        question.correct ??
+        "";
+
+    const correctText = String(correctAnswer).trim();
+
+    if (!correctText) {
+        return null;
+    }
+
+    const otherOptions =
+        question["سایر گزینه‌های چالشی"] ??
+        question.other_options ??
+        [];
+
+    let others = [];
+
+    if (Array.isArray(otherOptions)) {
+        others = otherOptions;
+    } else if (typeof otherOptions === "string") {
+        others = otherOptions.split(",");
+    }
+
+    const options = [correctText];
+
+    others.forEach(option => {
+        if (option === null || option === undefined) {
+            return;
+        }
+
+        const text = String(option).trim();
+
+        if (
+            text &&
+            !["-", "—", "–"].includes(text) &&
+            !options.includes(text)
+        ) {
+            options.push(text);
+        }
+    });
+
+    if (options.length < 2) {
+        return null;
+    }
+
+    return options;
+}
+
 async function loadQuestions(level) {
     const url = DATA_URLS[level];
 
@@ -91,7 +195,54 @@ async function loadQuestions(level) {
         throw new Error("ساختار سؤال‌ها نامعتبر است");
     }
 
-    return data;
+    const validQuestions = [];
+
+    data.forEach(question => {
+        if (!question || typeof question !== "object") {
+            return;
+        }
+
+        const questionText =
+            question["سؤال"] ||
+            question.question ||
+            "";
+
+        const correctAnswer =
+            question["پاسخ صحیح"] ??
+            question.correct_answer ??
+            question.correct ??
+            "";
+
+        if (!questionText || !correctAnswer) {
+            return;
+        }
+
+        const options = buildOptions(question);
+
+        if (!options) {
+            return;
+        }
+
+        const hasCorrectAnswer = options.some(option => {
+            return (
+                normalizeText(option) ===
+                normalizeText(correctAnswer)
+            );
+        });
+
+        if (!hasCorrectAnswer) {
+            return;
+        }
+
+        const preparedQuestion = {
+            ...question,
+            "گزینه‌ها": options
+        };
+
+        validQuestions.push(preparedQuestion);
+    });
+
+    return validQuestions;
 }
 
 async function startGame(level) {
@@ -118,7 +269,11 @@ async function startGame(level) {
             throw new Error("تعداد سؤال‌های این سطح کافی نیست");
         }
 
-        state.questions = shuffle(allQuestions).slice(0, QUESTION_COUNT);
+        state.questions = shuffle(allQuestions).slice(
+            0,
+            QUESTION_COUNT
+        );
+
         state.gameActive = true;
 
         showQuestion();
@@ -165,13 +320,15 @@ function showQuestion() {
         toPersianNumber(state.currentQuestion + 1);
 
     questionText.textContent =
-        current.question || current["سؤال"] || "";
+        current["سؤال"] ||
+        current.question ||
+        "";
 
     optionsContainer.innerHTML = "";
 
-    let options = current.options || current["گزینه‌ها"];
+    let options = buildOptions(current);
 
-    if (!Array.isArray(options)) {
+    if (!options) {
         options = [];
     }
 
@@ -182,11 +339,7 @@ function showQuestion() {
 
         button.className = "option-btn";
         button.type = "button";
-
-        button.textContent =
-            typeof option === "object"
-                ? option.text || option["متن"] || option.answer || ""
-                : option;
+        button.textContent = option;
 
         button.addEventListener("click", () => {
             answerQuestion(option, button);
@@ -236,8 +389,8 @@ function normalizeText(value) {
 
 function getCorrectAnswer(question) {
     return (
-        question.correct_answer ??
         question["پاسخ صحیح"] ??
+        question.correct_answer ??
         question.correct ??
         ""
     );
@@ -279,9 +432,11 @@ function answerQuestion(option, selectedButton) {
 
     clearTimer();
 
-    const current = state.questions[state.currentQuestion];
+    const current =
+        state.questions[state.currentQuestion];
 
-    const correct = isCorrect(option, current);
+    const correct =
+        isCorrect(option, current);
 
     const buttons =
         optionsContainer.querySelectorAll(".option-btn");
@@ -293,6 +448,7 @@ function answerQuestion(option, selectedButton) {
     if (correct) {
         state.score += 100;
         selectedButton.classList.add("correct");
+
     } else {
         state.wrongAnswers++;
 
@@ -303,10 +459,8 @@ function answerQuestion(option, selectedButton) {
         }
 
         buttons.forEach(button => {
-            const buttonValue = button.textContent;
-
             if (
-                normalizeText(buttonValue) ===
+                normalizeText(button.textContent) ===
                 normalizeText(getCorrectAnswer(current))
             ) {
                 button.classList.add("correct");
@@ -373,7 +527,8 @@ function finishGame() {
 
     state.gameActive = false;
 
-    resultLevel.textContent = state.levelName;
+    resultLevel.textContent =
+        state.levelName;
 
     finalScore.textContent =
         toPersianNumber(state.score);
@@ -387,7 +542,8 @@ function finishGame() {
     } else if (state.score >= 200) {
         message = "خوب بود! 🌿";
     } else {
-        message = "این پایان راه نیست؛ دوباره تلاش کن. 💚";
+        message =
+            "این پایان راه نیست؛ دوباره تلاش کن. 💚";
     }
 
     resultMessage.textContent = message;
@@ -418,11 +574,17 @@ document.querySelectorAll(".level-btn").forEach(button => {
     });
 });
 
-stopButton.addEventListener("click", stopGame);
+stopButton.addEventListener(
+    "click",
+    stopGame
+);
 
-restartButton.addEventListener("click", () => {
-    showScreen(homeScreen);
-});
+restartButton.addEventListener(
+    "click",
+    () => {
+        showScreen(homeScreen);
+    }
+);
 
 function initializeSoroushWebApp() {
     try {
@@ -430,13 +592,18 @@ function initializeSoroushWebApp() {
             window.Soroush &&
             window.Soroush.WebApp
         ) {
-            const webApp = window.Soroush.WebApp;
+            const webApp =
+                window.Soroush.WebApp;
 
-            if (typeof webApp.ready === "function") {
+            if (
+                typeof webApp.ready === "function"
+            ) {
                 webApp.ready();
             }
 
-            if (typeof webApp.expand === "function") {
+            if (
+                typeof webApp.expand === "function"
+            ) {
                 webApp.expand();
             }
         }
