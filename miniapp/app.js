@@ -4,9 +4,9 @@ const QUESTION_COUNT = 7;
 const QUESTION_TIME = 90;
 
 const DATA_URLS = {
-    ashenaei: "./ashenaei.json",
-    danaei: "./danaei.json",
-    ostad: "./Ostad.json"
+    ashenaei: "../ashenaei.json",
+    danaei: "../danaei.json",
+    ostad: "../Ostad.json"
 };
 
 const LEVEL_NAMES = {
