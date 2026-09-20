@@ -3,7 +3,14 @@
 const QUESTION_COUNT = 7;
 const QUESTION_TIME = 90;
 
-const API_URL = "/api";
+const BASE_URL =
+    "https://hasanzadeh4072-oss.github.io/Poetry-Challenge";
+
+const DATA_URLS = {
+    ashenaei: `${BASE_URL}/ashenaei.json`,
+    danaei: `${BASE_URL}/danaei.json`,
+    ostad: `${BASE_URL}/Ostad.json`
+};
 
 const LEVEL_NAMES = {
     ashenaei: "آشنایی",
@@ -18,6 +25,8 @@ const state = {
     currentQuestion: 0,
     score: 0,
     wrongAnswers: 0,
+    correctAnswers: 0,
+    unanswered: 0,
     timer: null,
     timeLeft: QUESTION_TIME,
     answered: false,
@@ -43,7 +52,10 @@ const stopButton = document.getElementById("stopButton");
 const restartButton = document.getElementById("restartButton");
 
 function toPersianNumber(value) {
-    return String(value).replace(/\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[digit]);
+    return String(value).replace(
+        /\d/g,
+        digit => "۰۱۲۳۴۵۶۷۸۹"[digit]
+    );
 }
 
 function showScreen(screen) {
@@ -60,77 +72,181 @@ function shuffle(array) {
     for (let i = result.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
 
-        [result[i], result[j]] = [result[j], result[i]];
+        [result[i], result[j]] =
+            [result[j], result[i]];
     }
 
     return result;
 }
 
 async function loadQuestions(level) {
+    const url = DATA_URLS[level];
+
+    if (!url) {
+        throw new Error("سطح نامعتبر است");
+    }
+
     const response = await fetch(
-        `${API_URL}/questions?level=${encodeURIComponent(level)}`
+        `${url}?v=${Date.now()}`,
+        {
+            cache: "no-store"
+        }
     );
 
     if (!response.ok) {
-        throw new Error("خطا در دریافت سؤال‌ها");
+        throw new Error(
+            `خطا در دریافت سؤال‌ها: ${response.status}`
+        );
     }
 
     const data = await response.json();
 
-    if (!data || !Array.isArray(data.questions)) {
-        throw new Error("ساختار سؤال‌ها نامعتبر است");
+    if (!Array.isArray(data)) {
+        throw new Error(
+            "ساختار فایل سؤال‌ها نامعتبر است"
+        );
     }
 
-    return data.questions;
+    return data.filter(question => {
+        return (
+            question &&
+            question["سؤال"] &&
+            question["پاسخ صحیح"]
+        );
+    });
+}
+
+function getOptions(question) {
+    let options = question["گزینه‌ها"];
+
+    if (Array.isArray(options)) {
+        options = options.filter(option => {
+            return (
+                option !== null &&
+                option !== undefined &&
+                String(option).trim() !== ""
+            );
+        });
+
+        if (options.length >= 2) {
+            return options;
+        }
+    }
+
+    const correct = question["پاسخ صحیح"];
+
+    let others =
+        question["سایر گزینه‌های چالشی"];
+
+    if (Array.isArray(others)) {
+        others = others.filter(option => {
+            return (
+                option !== null &&
+                option !== undefined &&
+                String(option).trim() !== ""
+            );
+        });
+    } else {
+        others = [];
+    }
+
+    return shuffle([
+        correct,
+        ...others
+    ]);
 }
 
 async function startGame(level) {
+    clearTimer();
+
     state.level = level;
-    state.levelName = LEVEL_NAMES[level] || level;
+    state.levelName =
+        LEVEL_NAMES[level] || level;
 
     state.currentQuestion = 0;
     state.score = 0;
     state.wrongAnswers = 0;
+    state.correctAnswers = 0;
+    state.unanswered = 0;
+    state.questions = [];
     state.gameActive = false;
 
-    levelName.textContent = state.levelName;
-    scoreElement.textContent = toPersianNumber(0);
+    levelName.textContent =
+        state.levelName;
+
+    scoreElement.textContent =
+        toPersianNumber(0);
 
     showScreen(gameScreen);
 
-    questionText.textContent = "در حال آماده‌سازی چالش...";
+    questionText.textContent =
+        "در حال آماده‌سازی چالش...";
+
     optionsContainer.innerHTML = "";
 
     try {
-        const allQuestions = await loadQuestions(level);
+        const allQuestions =
+            await loadQuestions(level);
 
-        if (allQuestions.length < QUESTION_COUNT) {
-            throw new Error("تعداد سؤال‌های این سطح کافی نیست");
+        if (
+            allQuestions.length <
+            QUESTION_COUNT
+        ) {
+            throw new Error(
+                "تعداد سؤال‌های این سطح کافی نیست"
+            );
         }
 
-        state.questions = shuffle(allQuestions).slice(0, QUESTION_COUNT);
+        state.questions =
+            shuffle(allQuestions)
+                .slice(0, QUESTION_COUNT)
+                .map(question => ({
+                    question,
+                    options: getOptions(question)
+                }));
+
+        for (const item of state.questions) {
+            if (item.options.length < 2) {
+                throw new Error(
+                    "یکی از سؤال‌ها گزینه کافی ندارد"
+                );
+            }
+        }
+
         state.gameActive = true;
 
         showQuestion();
 
     } catch (error) {
-        console.error(error);
+        console.error(
+            "START GAME ERROR:",
+            error
+        );
+
+        state.gameActive = false;
 
         questionText.textContent =
             "دریافت سؤال‌ها با مشکل مواجه شد.";
 
         optionsContainer.innerHTML = "";
 
-        const retryButton = document.createElement("button");
+        const retryButton =
+            document.createElement("button");
 
-        retryButton.className = "primary-btn";
-        retryButton.textContent = "🔄 تلاش دوباره";
+        retryButton.className =
+            "primary-btn";
 
-        retryButton.addEventListener("click", () => {
-            startGame(level);
-        });
+        retryButton.textContent =
+            "🔄 تلاش دوباره";
 
-        optionsContainer.appendChild(retryButton);
+        retryButton.addEventListener(
+            "click",
+            () => startGame(level)
+        );
+
+        optionsContainer.appendChild(
+            retryButton
+        );
     }
 }
 
@@ -141,79 +257,117 @@ function showQuestion() {
         return;
     }
 
-    if (state.currentQuestion >= state.questions.length) {
+    if (
+        state.currentQuestion >=
+        state.questions.length
+    ) {
         finishGame();
         return;
     }
 
-    const current = state.questions[state.currentQuestion];
+    const item =
+        state.questions[
+            state.currentQuestion
+        ];
+
+    const question =
+        item.question;
 
     state.answered = false;
-    state.timeLeft = QUESTION_TIME;
+    state.timeLeft =
+        QUESTION_TIME;
 
     questionNumber.textContent =
-        toPersianNumber(state.currentQuestion + 1);
+        toPersianNumber(
+            state.currentQuestion + 1
+        );
 
     questionText.textContent =
-        current.question || current["سؤال"] || "";
+        question["سؤال"];
 
     optionsContainer.innerHTML = "";
 
-    let options = current.options || current["گزینه‌ها"];
-
-    if (!Array.isArray(options)) {
-        options = [];
-    }
-
-    options = shuffle(options);
+    const options =
+        shuffle(item.options);
 
     options.forEach(option => {
-        const button = document.createElement("button");
+        const button =
+            document.createElement("button");
 
-        button.className = "option-btn";
+        button.className =
+            "option-btn";
+
         button.type = "button";
 
         button.textContent =
-            typeof option === "object"
-                ? option.text || option["متن"] || option.answer || ""
-                : option;
+            String(option);
 
-        button.addEventListener("click", () => {
-            answerQuestion(option, button);
-        });
+        button.addEventListener(
+            "click",
+            () => {
+                answerQuestion(
+                    option,
+                    button
+                );
+            }
+        );
 
-        optionsContainer.appendChild(button);
+        optionsContainer.appendChild(
+            button
+        );
     });
 
     updateTimer();
 
-    state.timer = setInterval(() => {
-        state.timeLeft--;
+    state.timer =
+        setInterval(() => {
+            if (!state.gameActive) {
+                clearTimer();
+                return;
+            }
 
-        updateTimer();
+            state.timeLeft--;
 
-        if (state.timeLeft <= 0) {
-            clearTimer();
-            timeExpired();
-        }
-    }, 1000);
+            updateTimer();
+
+            if (
+                state.timeLeft <= 0
+            ) {
+                clearTimer();
+                timeExpired();
+            }
+        }, 1000);
 }
 
 function updateTimer() {
-    const minutes = Math.floor(state.timeLeft / 60);
-    const seconds = state.timeLeft % 60;
+    const minutes =
+        Math.floor(
+            state.timeLeft / 60
+        );
+
+    const seconds =
+        state.timeLeft % 60;
 
     timerElement.textContent =
         `${toPersianNumber(minutes)}:${toPersianNumber(
             String(seconds).padStart(2, "0")
         )}`;
 
-    timerElement.classList.remove("warning", "danger");
+    timerElement.classList.remove(
+        "warning",
+        "danger"
+    );
 
     if (state.timeLeft <= 10) {
-        timerElement.classList.add("danger");
-    } else if (state.timeLeft <= 30) {
-        timerElement.classList.add("warning");
+        timerElement.classList.add(
+            "danger"
+        );
+    } else if (
+        state.timeLeft <= 30
+    ) {
+        timerElement.classList.add(
+            "warning"
+        );
     }
 }
 
@@ -225,39 +379,27 @@ function normalizeText(value) {
 }
 
 function getCorrectAnswer(question) {
+    return question["پاسخ صحیح"] || "";
+}
+
+function isCorrect(
+    selectedAnswer,
+    question
+) {
     return (
-        question.correct_answer ??
-        question["پاسخ صحیح"] ??
-        question.correct ??
-        ""
+        normalizeText(
+            selectedAnswer
+        ) ===
+        normalizeText(
+            getCorrectAnswer(question)
+        )
     );
 }
 
-function isCorrect(option, question) {
-    const correctAnswer = getCorrectAnswer(question);
-
-    if (typeof option === "object") {
-        const optionValue =
-            option.value ??
-            option["مقدار"] ??
-            option.answer ??
-            option["پاسخ"] ??
-            option.text ??
-            option["متن"];
-
-        return (
-            normalizeText(optionValue) ===
-            normalizeText(correctAnswer)
-        );
-    }
-
-    return (
-        normalizeText(option) ===
-        normalizeText(correctAnswer)
-    );
-}
-
-function answerQuestion(option, selectedButton) {
+function answerQuestion(
+    selectedAnswer,
+    selectedButton
+) {
     if (
         !state.gameActive ||
         state.answered
@@ -269,12 +411,24 @@ function answerQuestion(option, selectedButton) {
 
     clearTimer();
 
-    const current = state.questions[state.currentQuestion];
+    const item =
+        state.questions[
+            state.currentQuestion
+        ];
 
-    const correct = isCorrect(option, current);
+    const question =
+        item.question;
+
+    const correct =
+        isCorrect(
+            selectedAnswer,
+            question
+        );
 
     const buttons =
-        optionsContainer.querySelectorAll(".option-btn");
+        optionsContainer.querySelectorAll(
+            ".option-btn"
+        );
 
     buttons.forEach(button => {
         button.disabled = true;
@@ -282,30 +436,48 @@ function answerQuestion(option, selectedButton) {
 
     if (correct) {
         state.score += 100;
-        selectedButton.classList.add("correct");
+        state.correctAnswers++;
+
+        selectedButton.classList.add(
+            "correct"
+        );
+
     } else {
         state.wrongAnswers++;
 
-        selectedButton.classList.add("wrong");
+        selectedButton.classList.add(
+            "wrong"
+        );
 
-        if (state.wrongAnswers % 2 === 0) {
+        if (
+            state.wrongAnswers % 2 === 0
+        ) {
             state.score -= 15;
         }
 
-        buttons.forEach(button => {
-            const buttonValue = button.textContent;
+        const correctAnswer =
+            getCorrectAnswer(question);
 
+        buttons.forEach(button => {
             if (
-                normalizeText(buttonValue) ===
-                normalizeText(getCorrectAnswer(current))
+                normalizeText(
+                    button.textContent
+                ) ===
+                normalizeText(
+                    correctAnswer
+                )
             ) {
-                button.classList.add("correct");
+                button.classList.add(
+                    "correct"
+                );
             }
         });
     }
 
     scoreElement.textContent =
-        toPersianNumber(state.score);
+        toPersianNumber(
+            state.score
+        );
 
     setTimeout(() => {
         nextQuestion();
@@ -321,9 +493,12 @@ function timeExpired() {
     }
 
     state.answered = true;
+    state.unanswered++;
 
     const buttons =
-        optionsContainer.querySelectorAll(".option-btn");
+        optionsContainer.querySelectorAll(
+            ".option-btn"
+        );
 
     buttons.forEach(button => {
         button.disabled = true;
@@ -363,56 +538,79 @@ function finishGame() {
 
     state.gameActive = false;
 
-    resultLevel.textContent = state.levelName;
+    resultLevel.textContent =
+        state.levelName;
 
     finalScore.textContent =
-        toPersianNumber(state.score);
+        toPersianNumber(
+            state.score
+        );
 
     let message;
 
     if (state.score >= 600) {
-        message = "فوق‌العاده! 🌟";
-    } else if (state.score >= 400) {
-        message = "عالی! 👏";
-    } else if (state.score >= 200) {
-        message = "خوب بود! 🌿";
+        message =
+            "فوق‌العاده! 🌟";
+    } else if (
+        state.score >= 400
+    ) {
+        message =
+            "عالی! 👏";
+    } else if (
+        state.score >= 200
+    ) {
+        message =
+            "خوب بود! 🌿";
     } else {
-        message = "این پایان راه نیست؛ دوباره تلاش کن. 💚";
+        message =
+            "این پایان راه نیست؛ دوباره تلاش کن. 💚";
     }
 
-    resultMessage.textContent = message;
+    resultMessage.textContent =
+        message;
 
-    showScreen(resultScreen);
+    showScreen(
+        resultScreen
+    );
 }
 
 function stopGame() {
-    if (!state.gameActive) {
-        showScreen(homeScreen);
-        return;
-    }
-
     clearTimer();
 
     state.gameActive = false;
 
-    showScreen(homeScreen);
+    showScreen(
+        homeScreen
+    );
 }
 
-document.querySelectorAll(".level-btn").forEach(button => {
-    button.addEventListener("click", () => {
-        const level = button.dataset.level;
+document
+    .querySelectorAll(".level-btn")
+    .forEach(button => {
+        button.addEventListener(
+            "click",
+            () => {
+                const level =
+                    button.dataset.level;
 
-        if (level) {
-            startGame(level);
-        }
+                if (level) {
+                    startGame(level);
+                }
+            }
+        );
     });
-});
 
-stopButton.addEventListener("click", stopGame);
+stopButton.addEventListener(
+    "click",
+    stopGame
+);
 
-restartButton.addEventListener("click", () => {
-    showScreen(homeScreen);
-});
+restartButton.addEventListener(
+    "click",
+    () => {
+        showScreen(homeScreen);
+    }
+);
 
 function initializeSoroushWebApp() {
     try {
@@ -420,13 +618,20 @@ function initializeSoroushWebApp() {
             window.Soroush &&
             window.Soroush.WebApp
         ) {
-            const webApp = window.Soroush.WebApp;
+            const webApp =
+                window.Soroush.WebApp;
 
-            if (typeof webApp.ready === "function") {
+            if (
+                typeof webApp.ready ===
+                "function"
+            ) {
                 webApp.ready();
             }
 
-            if (typeof webApp.expand === "function") {
+            if (
+                typeof webApp.expand ===
+                "function"
+            ) {
                 webApp.expand();
             }
         }
