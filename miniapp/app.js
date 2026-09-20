@@ -651,6 +651,20 @@ function finishGame() {
     resultMessage.textContent =
         message;
 
+    /*
+     * نمایش آمار پاسخ‌ها
+     */
+    const resultStats =
+        document.getElementById("resultStats");
+
+    if (resultStats) {
+        resultStats.innerHTML = `
+            <div>✅ پاسخ صحیح: ${toPersianNumber(state.correctAnswers)}</div>
+            <div>❌ پاسخ غلط: ${toPersianNumber(state.wrongAnswers)}</div>
+            <div>⏳ بی‌پاسخ: ${toPersianNumber(state.unanswered)}</div>
+        `;
+    }
+
     showScreen(
         resultScreen
     );
