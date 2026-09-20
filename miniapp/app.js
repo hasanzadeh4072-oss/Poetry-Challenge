@@ -46,9 +46,14 @@ const resultMessage = document.getElementById("resultMessage");
 const stopButton = document.getElementById("stopButton");
 const restartButton = document.getElementById("restartButton");
 
+
 function toPersianNumber(value) {
-    return String(value).replace(/\d/g, digit => "۰۱۲۳۴۵۶۷۸۹"[digit]);
+    return String(value).replace(
+        /\d/g,
+        digit => "۰۱۲۳۴۵۶۷۸۹"[digit]
+    );
 }
+
 
 function showScreen(screen) {
     [homeScreen, gameScreen, resultScreen].forEach(item => {
@@ -58,22 +63,53 @@ function showScreen(screen) {
     screen.classList.add("active");
 }
 
+
 function shuffle(array) {
     const result = [...array];
 
     for (let i = result.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
 
-        [result[i], result[j]] = [result[j], result[i]];
+        [result[i], result[j]] = [
+            result[j],
+            result[i]
+        ];
     }
 
     return result;
 }
 
+
+function normalizeText(value) {
+    return String(value ?? "")
+        .trim()
+        .replace(/ي/g, "ی")
+        .replace(/ك/g, "ک");
+}
+
+
+function getCorrectAnswer(question) {
+    return (
+        question.correct_answer ??
+        question["پاسخ صحیح"] ??
+        question.correct ??
+        ""
+    );
+}
+
+
 function buildOptions(question) {
-    const questionType = String(
-        question["نوع سؤال"] || ""
-    ).trim();
+    const correctAnswer = getCorrectAnswer(question);
+
+    if (!correctAnswer) {
+        return [];
+    }
+
+    const questionType = normalizeText(
+        question["نوع سؤال"] ||
+        question.question_type ||
+        ""
+    );
 
     if (
         questionType === "صحیح/غلط" ||
@@ -85,94 +121,74 @@ function buildOptions(question) {
         return ["صحیح", "غلط"];
     }
 
-    const existingOptions =
+    let otherOptions =
+        question.options ||
         question["گزینه‌ها"] ||
-        question.options;
-
-    if (Array.isArray(existingOptions)) {
-        const cleanOptions = [];
-
-        existingOptions.forEach(option => {
-            if (option === null || option === undefined) {
-                return;
-            }
-
-            const value =
-                typeof option === "object"
-                    ? (
-                        option.text ||
-                        option["متن"] ||
-                        option.answer ||
-                        option["پاسخ"] ||
-                        ""
-                    )
-                    : option;
-
-            const text = String(value).trim();
-
-            if (
-                text &&
-                !["-", "—", "–"].includes(text) &&
-                !cleanOptions.includes(text)
-            ) {
-                cleanOptions.push(text);
-            }
-        });
-
-        if (cleanOptions.length >= 2) {
-            return cleanOptions;
-        }
-    }
-
-    const correctAnswer =
-        question["پاسخ صحیح"] ??
-        question.correct_answer ??
-        question.correct ??
-        "";
-
-    const correctText = String(correctAnswer).trim();
-
-    if (!correctText) {
-        return null;
-    }
-
-    const otherOptions =
-        question["سایر گزینه‌های چالشی"] ??
-        question.other_options ??
+        question["سایر گزینه‌های چالشی"] ||
         [];
 
-    let others = [];
-
     if (Array.isArray(otherOptions)) {
-        others = otherOptions;
+        otherOptions = otherOptions
+            .map(item => {
+                if (typeof item === "object") {
+                    return (
+                        item.text ||
+                        item["متن"] ||
+                        item.answer ||
+                        item["پاسخ"] ||
+                        ""
+                    );
+                }
+
+                return String(item);
+            })
+            .map(item => item.trim())
+            .filter(Boolean);
     } else if (typeof otherOptions === "string") {
-        others = otherOptions.split(",");
+        otherOptions = otherOptions
+            .split(",")
+            .map(item => item.trim())
+            .filter(Boolean);
+    } else {
+        otherOptions = [];
     }
 
-    const options = [correctText];
+    const options = [
+        correctAnswer,
+        ...otherOptions
+    ];
 
-    others.forEach(option => {
-        if (option === null || option === undefined) {
+    const uniqueOptions = [];
+
+    options.forEach(option => {
+        if (!option) {
             return;
         }
 
-        const text = String(option).trim();
+        const value = String(option).trim();
 
         if (
-            text &&
-            !["-", "—", "–"].includes(text) &&
-            !options.includes(text)
+            value === "-" ||
+            value === "—" ||
+            value === "–"
         ) {
-            options.push(text);
+            return;
+        }
+
+        if (
+            !uniqueOptions.some(
+                existing =>
+                    normalizeText(existing) ===
+                    normalizeText(value)
+            )
+        ) {
+            uniqueOptions.push(value);
         }
     });
 
-    if (options.length < 2) {
-        return null;
-    }
-
-    return options;
+    return uniqueOptions;
 }
+
 
 async function loadQuestions(level) {
     const url = DATA_URLS[level];
@@ -181,98 +197,90 @@ async function loadQuestions(level) {
         throw new Error("سطح نامعتبر است");
     }
 
-    const response = await fetch(url, {
-        cache: "no-store"
-    });
+    const response = await fetch(
+        url + "?v=" + Date.now(),
+        {
+            cache: "no-store"
+        }
+    );
 
     if (!response.ok) {
-        throw new Error("خطا در دریافت سؤال‌ها");
+        throw new Error(
+            "خطا در دریافت سؤال‌ها"
+        );
     }
 
     const data = await response.json();
 
     if (!Array.isArray(data)) {
-        throw new Error("ساختار سؤال‌ها نامعتبر است");
+        throw new Error(
+            "ساختار سؤال‌ها نامعتبر است"
+        );
     }
 
-    const validQuestions = [];
+    const validQuestions = data
+        .map(question => {
+            const options =
+                buildOptions(question);
 
-    data.forEach(question => {
-        if (!question || typeof question !== "object") {
-            return;
-        }
-
-        const questionText =
-            question["سؤال"] ||
-            question.question ||
-            "";
-
-        const correctAnswer =
-            question["پاسخ صحیح"] ??
-            question.correct_answer ??
-            question.correct ??
-            "";
-
-        if (!questionText || !correctAnswer) {
-            return;
-        }
-
-        const options = buildOptions(question);
-
-        if (!options) {
-            return;
-        }
-
-        const hasCorrectAnswer = options.some(option => {
+            return {
+                ...question,
+                options
+            };
+        })
+        .filter(question => {
             return (
-                normalizeText(option) ===
-                normalizeText(correctAnswer)
+                question["سؤال"] &&
+                getCorrectAnswer(question) &&
+                question.options.length >= 2
             );
         });
-
-        if (!hasCorrectAnswer) {
-            return;
-        }
-
-        const preparedQuestion = {
-            ...question,
-            "گزینه‌ها": options
-        };
-
-        validQuestions.push(preparedQuestion);
-    });
 
     return validQuestions;
 }
 
+
 async function startGame(level) {
     state.level = level;
-    state.levelName = LEVEL_NAMES[level] || level;
+    state.levelName =
+        LEVEL_NAMES[level] || level;
 
     state.currentQuestion = 0;
     state.score = 0;
     state.wrongAnswers = 0;
     state.gameActive = false;
 
-    levelName.textContent = state.levelName;
-    scoreElement.textContent = toPersianNumber(0);
+    levelName.textContent =
+        state.levelName;
+
+    scoreElement.textContent =
+        toPersianNumber(0);
 
     showScreen(gameScreen);
 
-    questionText.textContent = "در حال آماده‌سازی چالش...";
+    questionText.textContent =
+        "در حال آماده‌سازی چالش...";
+
     optionsContainer.innerHTML = "";
 
     try {
-        const allQuestions = await loadQuestions(level);
+        const allQuestions =
+            await loadQuestions(level);
 
-        if (allQuestions.length < QUESTION_COUNT) {
-            throw new Error("تعداد سؤال‌های این سطح کافی نیست");
+        if (
+            allQuestions.length <
+            QUESTION_COUNT
+        ) {
+            throw new Error(
+                "تعداد سؤال‌های این سطح کافی نیست"
+            );
         }
 
-        state.questions = shuffle(allQuestions).slice(
-            0,
-            QUESTION_COUNT
-        );
+        state.questions =
+            shuffle(allQuestions).slice(
+                0,
+                QUESTION_COUNT
+            );
 
         state.gameActive = true;
 
@@ -286,18 +294,28 @@ async function startGame(level) {
 
         optionsContainer.innerHTML = "";
 
-        const retryButton = document.createElement("button");
+        const retryButton =
+            document.createElement("button");
 
-        retryButton.className = "primary-btn";
-        retryButton.textContent = "🔄 تلاش دوباره";
+        retryButton.className =
+            "primary-btn";
 
-        retryButton.addEventListener("click", () => {
-            startGame(level);
-        });
+        retryButton.textContent =
+            "🔄 تلاش دوباره";
 
-        optionsContainer.appendChild(retryButton);
+        retryButton.addEventListener(
+            "click",
+            () => {
+                startGame(level);
+            }
+        );
+
+        optionsContainer.appendChild(
+            retryButton
+        );
     }
 }
+
 
 function showQuestion() {
     clearTimer();
@@ -306,18 +324,26 @@ function showQuestion() {
         return;
     }
 
-    if (state.currentQuestion >= state.questions.length) {
+    if (
+        state.currentQuestion >=
+        state.questions.length
+    ) {
         finishGame();
         return;
     }
 
-    const current = state.questions[state.currentQuestion];
+    const current =
+        state.questions[
+            state.currentQuestion
+        ];
 
     state.answered = false;
     state.timeLeft = QUESTION_TIME;
 
     questionNumber.textContent =
-        toPersianNumber(state.currentQuestion + 1);
+        toPersianNumber(
+            state.currentQuestion + 1
+        );
 
     questionText.textContent =
         current["سؤال"] ||
@@ -326,101 +352,129 @@ function showQuestion() {
 
     optionsContainer.innerHTML = "";
 
-    let options = buildOptions(current);
-
-    if (!options) {
-        options = [];
-    }
-
-    options = shuffle(options);
+    const options =
+        shuffle(
+            current.options || []
+        );
 
     options.forEach(option => {
-        const button = document.createElement("button");
+        const button =
+            document.createElement("button");
 
-        button.className = "option-btn";
+        button.className =
+            "option-btn";
+
         button.type = "button";
-        button.textContent = option;
 
-        button.addEventListener("click", () => {
-            answerQuestion(option, button);
-        });
+        button.textContent =
+            typeof option === "object"
+                ? (
+                    option.text ||
+                    option["متن"] ||
+                    option.answer ||
+                    ""
+                )
+                : option;
 
-        optionsContainer.appendChild(button);
+        button.addEventListener(
+            "click",
+            () => {
+                answerQuestion(
+                    option,
+                    button
+                );
+            }
+        );
+
+        optionsContainer.appendChild(
+            button
+        );
     });
 
     updateTimer();
 
-    state.timer = setInterval(() => {
-        state.timeLeft--;
+    state.timer =
+        setInterval(() => {
+            state.timeLeft--;
 
-        updateTimer();
+            updateTimer();
 
-        if (state.timeLeft <= 0) {
-            clearTimer();
-            timeExpired();
-        }
-    }, 1000);
+            if (
+                state.timeLeft <= 0
+            ) {
+                clearTimer();
+                timeExpired();
+            }
+        }, 1000);
 }
 
+
 function updateTimer() {
-    const minutes = Math.floor(state.timeLeft / 60);
-    const seconds = state.timeLeft % 60;
+    const minutes =
+        Math.floor(
+            state.timeLeft / 60
+        );
+
+    const seconds =
+        state.timeLeft % 60;
 
     timerElement.textContent =
         `${toPersianNumber(minutes)}:${toPersianNumber(
             String(seconds).padStart(2, "0")
         )}`;
 
-    timerElement.classList.remove("warning", "danger");
-
-    if (state.timeLeft <= 10) {
-        timerElement.classList.add("danger");
-    } else if (state.timeLeft <= 30) {
-        timerElement.classList.add("warning");
-    }
-}
-
-function normalizeText(value) {
-    return String(value ?? "")
-        .trim()
-        .replace(/ي/g, "ی")
-        .replace(/ك/g, "ک");
-}
-
-function getCorrectAnswer(question) {
-    return (
-        question["پاسخ صحیح"] ??
-        question.correct_answer ??
-        question.correct ??
-        ""
+    timerElement.classList.remove(
+        "warning",
+        "danger"
     );
-}
 
-function isCorrect(option, question) {
-    const correctAnswer = getCorrectAnswer(question);
-
-    if (typeof option === "object") {
-        const optionValue =
-            option.value ??
-            option["مقدار"] ??
-            option.answer ??
-            option["پاسخ"] ??
-            option.text ??
-            option["متن"];
-
-        return (
-            normalizeText(optionValue) ===
-            normalizeText(correctAnswer)
+    if (
+        state.timeLeft <= 10
+    ) {
+        timerElement.classList.add(
+            "danger"
+        );
+    } else if (
+        state.timeLeft <= 30
+    ) {
+        timerElement.classList.add(
+            "warning"
         );
     }
+}
+
+
+function isCorrect(
+    option,
+    question
+) {
+    const correctAnswer =
+        getCorrectAnswer(question);
+
+    const optionValue =
+        typeof option === "object"
+            ? (
+                option.value ??
+                option["مقدار"] ??
+                option.answer ??
+                option["پاسخ"] ??
+                option.text ??
+                option["متن"] ??
+                ""
+            )
+            : option;
 
     return (
-        normalizeText(option) ===
+        normalizeText(optionValue) ===
         normalizeText(correctAnswer)
     );
 }
 
-function answerQuestion(option, selectedButton) {
+
+function answerQuestion(
+    option,
+    selectedButton
+) {
     if (
         !state.gameActive ||
         state.answered
@@ -433,13 +487,20 @@ function answerQuestion(option, selectedButton) {
     clearTimer();
 
     const current =
-        state.questions[state.currentQuestion];
+        state.questions[
+            state.currentQuestion
+        ];
 
     const correct =
-        isCorrect(option, current);
+        isCorrect(
+            option,
+            current
+        );
 
     const buttons =
-        optionsContainer.querySelectorAll(".option-btn");
+        optionsContainer.querySelectorAll(
+            ".option-btn"
+        );
 
     buttons.forEach(button => {
         button.disabled = true;
@@ -447,34 +508,55 @@ function answerQuestion(option, selectedButton) {
 
     if (correct) {
         state.score += 100;
-        selectedButton.classList.add("correct");
+
+        selectedButton.classList.add(
+            "correct"
+        );
 
     } else {
         state.wrongAnswers++;
 
-        selectedButton.classList.add("wrong");
+        selectedButton.classList.add(
+            "wrong"
+        );
 
-        if (state.wrongAnswers % 2 === 0) {
+        if (
+            state.wrongAnswers % 2 === 0
+        ) {
             state.score -= 15;
         }
 
         buttons.forEach(button => {
+            const buttonValue =
+                button.textContent;
+
             if (
-                normalizeText(button.textContent) ===
-                normalizeText(getCorrectAnswer(current))
+                normalizeText(
+                    buttonValue
+                ) ===
+                normalizeText(
+                    getCorrectAnswer(
+                        current
+                    )
+                )
             ) {
-                button.classList.add("correct");
+                button.classList.add(
+                    "correct"
+                );
             }
         });
     }
 
     scoreElement.textContent =
-        toPersianNumber(state.score);
+        toPersianNumber(
+            state.score
+        );
 
     setTimeout(() => {
         nextQuestion();
     }, 700);
 }
+
 
 function timeExpired() {
     if (
@@ -487,7 +569,9 @@ function timeExpired() {
     state.answered = true;
 
     const buttons =
-        optionsContainer.querySelectorAll(".option-btn");
+        optionsContainer.querySelectorAll(
+            ".option-btn"
+        );
 
     buttons.forEach(button => {
         button.disabled = true;
@@ -497,6 +581,7 @@ function timeExpired() {
         nextQuestion();
     }, 500);
 }
+
 
 function nextQuestion() {
     if (!state.gameActive) {
@@ -515,12 +600,17 @@ function nextQuestion() {
     }
 }
 
+
 function clearTimer() {
     if (state.timer !== null) {
-        clearInterval(state.timer);
+        clearInterval(
+            state.timer
+        );
+
         state.timer = null;
     }
 }
+
 
 function finishGame() {
     clearTimer();
@@ -531,25 +621,37 @@ function finishGame() {
         state.levelName;
 
     finalScore.textContent =
-        toPersianNumber(state.score);
+        toPersianNumber(
+            state.score
+        );
 
     let message;
 
     if (state.score >= 600) {
-        message = "فوق‌العاده! 🌟";
+        message =
+            "فوق‌العاده! 🌟";
+
     } else if (state.score >= 400) {
-        message = "عالی! 👏";
+        message =
+            "عالی! 👏";
+
     } else if (state.score >= 200) {
-        message = "خوب بود! 🌿";
+        message =
+            "خوب بود! 🌿";
+
     } else {
         message =
             "این پایان راه نیست؛ دوباره تلاش کن. 💚";
     }
 
-    resultMessage.textContent = message;
+    resultMessage.textContent =
+        message;
 
-    showScreen(resultScreen);
+    showScreen(
+        resultScreen
+    );
 }
+
 
 function stopGame() {
     if (!state.gameActive) {
@@ -564,20 +666,29 @@ function stopGame() {
     showScreen(homeScreen);
 }
 
-document.querySelectorAll(".level-btn").forEach(button => {
-    button.addEventListener("click", () => {
-        const level = button.dataset.level;
 
-        if (level) {
-            startGame(level);
-        }
+document
+    .querySelectorAll(".level-btn")
+    .forEach(button => {
+        button.addEventListener(
+            "click",
+            () => {
+                const level =
+                    button.dataset.level;
+
+                if (level) {
+                    startGame(level);
+                }
+            }
+        );
     });
-});
+
 
 stopButton.addEventListener(
     "click",
     stopGame
 );
+
 
 restartButton.addEventListener(
     "click",
@@ -585,6 +696,7 @@ restartButton.addEventListener(
         showScreen(homeScreen);
     }
 );
+
 
 function initializeSoroushWebApp() {
     try {
@@ -596,13 +708,15 @@ function initializeSoroushWebApp() {
                 window.Soroush.WebApp;
 
             if (
-                typeof webApp.ready === "function"
+                typeof webApp.ready ===
+                "function"
             ) {
                 webApp.ready();
             }
 
             if (
-                typeof webApp.expand === "function"
+                typeof webApp.expand ===
+                "function"
             ) {
                 webApp.expand();
             }
@@ -614,5 +728,6 @@ function initializeSoroushWebApp() {
         );
     }
 }
+
 
 initializeSoroushWebApp();
