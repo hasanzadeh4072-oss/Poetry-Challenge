@@ -75,7 +75,11 @@ async function loadQuestions(level) {
     const levelName = LEVEL_NAMES[level];
 
     return data.filter(question => {
-        if (!question || !question["سؤال"] || !question["پاسخ صحیح"]) {
+        if (
+            !question ||
+            !question["سؤال"] ||
+            !question["پاسخ صحیح"]
+        ) {
             return false;
         }
 
@@ -248,7 +252,7 @@ function showQuestion() {
                 </div>
             </div>
 
-            <div class="options-container" id="options-container">
+            <div class="options-container">
                 ${options.map((option, index) => `
                     <button
                         class="option-btn"
@@ -257,6 +261,7 @@ function showQuestion() {
                         <span class="option-letter">
                             ${"الفبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی"[index] || ""}
                         </span>
+
                         <span class="option-text">
                             ${option}
                         </span>
@@ -313,7 +318,8 @@ function startTimer() {
 }
 
 function updateTimer() {
-    const timer = document.getElementById("timer");
+    const timer =
+        document.getElementById("timer");
 
     if (!timer) {
         return;
@@ -342,7 +348,9 @@ function normalizeText(text) {
 }
 
 function getCorrectAnswer(question) {
-    return normalizeText(question["پاسخ صحیح"]);
+    return normalizeText(
+        question["پاسخ صحیح"]
+    );
 }
 
 function isCorrect(option, question) {
@@ -437,7 +445,10 @@ function nextQuestion() {
 
     state.currentQuestion++;
 
-    if (state.currentQuestion >= QUESTION_COUNT) {
+    if (
+        state.currentQuestion >=
+        QUESTION_COUNT
+    ) {
         finishGame();
         return;
     }
@@ -453,29 +464,37 @@ function clearTimer() {
 }
 
 /* =========================================================
-   PERFECT SCORE — READY-MADE LOTTIE ANIMATION
+   READY-MADE EXTERNAL ANIMATION
    ========================================================= */
 
-function loadLottiePlayer() {
+const PERFECT_ANIMATION_URL =
+    "https://assets-v2.lottiefiles.com/a/9c0c9d5c-7c2d-11ee-8c99-4f1c0c7d2d0f/animation.json";
+
+function loadLottieScript() {
     return new Promise(resolve => {
-        if (window.customElements?.get("lottie-player")) {
+        if (
+            window.lottie &&
+            typeof window.lottie.loadAnimation === "function"
+        ) {
             resolve(true);
             return;
         }
 
-        const existing =
+        const oldScript =
             document.querySelector(
-                'script[data-lottie-player="true"]'
+                'script[data-lottie="true"]'
             );
 
-        if (existing) {
-            existing.addEventListener(
+        if (oldScript) {
+            oldScript.addEventListener(
                 "load",
-                () => resolve(true),
+                () => resolve(
+                    !!window.lottie
+                ),
                 { once: true }
             );
 
-            existing.addEventListener(
+            oldScript.addEventListener(
                 "error",
                 () => resolve(false),
                 { once: true }
@@ -484,21 +503,29 @@ function loadLottiePlayer() {
             return;
         }
 
-        const script = document.createElement("script");
+        const script =
+            document.createElement("script");
 
         script.src =
-            "https://unpkg.com/@lottiefiles/lottie-player@2.0.12/dist/lottie-player.js";
+            "https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js";
 
-        script.dataset.lottiePlayer = "true";
+        script.dataset.lottie = "true";
 
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
+        script.onload = () => {
+            resolve(
+                !!window.lottie
+            );
+        };
+
+        script.onerror = () => {
+            resolve(false);
+        };
 
         document.head.appendChild(script);
     });
 }
 
-function showPerfectScoreAnimation() {
+async function showPerfectScoreAnimation() {
     clearTimer();
 
     const overlay =
@@ -507,35 +534,53 @@ function showPerfectScoreAnimation() {
     overlay.id = "perfect-score-overlay";
 
     overlay.innerHTML = `
-        <div class="perfect-score-content">
-
-            <lottie-player
-                id="perfect-lottie"
-                src="https://lottie.host/6c0d4d1f-4b6f-4e0e-9e20-7c7f1e1e4e0f/5fM3JfQ9uT.json"
-                background="transparent"
-                speed="1"
-                loop="false"
-                autoplay
-            ></lottie-player>
-
-            <div class="perfect-score-title">
-                ✨ امتیاز کامل! ✨
-            </div>
-
-            <div class="perfect-score-number">
-                ۷۰۰
-            </div>
-
-            <div class="perfect-score-subtitle">
-                هر ۷ سؤال را درست پاسخ دادی! 🏆
-            </div>
-
-        </div>
+        <div
+            id="perfect-animation"
+            class="perfect-animation"
+        ></div>
     `;
 
     document.body.appendChild(overlay);
 
-    loadLottiePlayer();
+    const loaded =
+        await loadLottieScript();
+
+    if (!loaded) {
+        overlay.remove();
+        showResultScreen();
+        return;
+    }
+
+    try {
+        window.lottie.loadAnimation({
+            container:
+                document.getElementById(
+                    "perfect-animation"
+                ),
+
+            renderer: "svg",
+
+            loop: false,
+
+            autoplay: true,
+
+            path: PERFECT_ANIMATION_URL,
+
+            rendererSettings: {
+                preserveAspectRatio:
+                    "xMidYMid meet"
+            }
+        });
+    } catch (error) {
+        console.error(
+            "Lottie animation error:",
+            error
+        );
+
+        overlay.remove();
+        showResultScreen();
+        return;
+    }
 
     setTimeout(() => {
         overlay.classList.add("hide");
@@ -543,7 +588,7 @@ function showPerfectScoreAnimation() {
         setTimeout(() => {
             overlay.remove();
             showResultScreen();
-        }, 500);
+        }, 400);
     }, 5000);
 }
 
@@ -589,31 +634,43 @@ function showResultScreen() {
                 <div class="result-stat">
                     <span>پاسخ صحیح</span>
                     <strong>
-                        ${toPersianNumber(state.correctAnswers)}
+                        ${toPersianNumber(
+                            state.correctAnswers
+                        )}
                     </strong>
                 </div>
 
                 <div class="result-stat">
                     <span>پاسخ غلط</span>
                     <strong>
-                        ${toPersianNumber(state.wrongAnswers)}
+                        ${toPersianNumber(
+                            state.wrongAnswers
+                        )}
                     </strong>
                 </div>
 
                 <div class="result-stat">
                     <span>بدون پاسخ</span>
                     <strong>
-                        ${toPersianNumber(state.unanswered)}
+                        ${toPersianNumber(
+                            state.unanswered
+                        )}
                     </strong>
                 </div>
 
             </div>
 
-            <button class="primary-btn" id="play-again">
+            <button
+                class="primary-btn"
+                id="play-again"
+            >
                 🔄 دوباره بازی کن
             </button>
 
-            <button class="secondary-btn" id="result-home">
+            <button
+                class="secondary-btn"
+                id="result-home"
+            >
                 🏠 بازگشت
             </button>
 
@@ -622,13 +679,17 @@ function showResultScreen() {
 
     document
         .getElementById("play-again")
-        ?.addEventListener("click", () => {
-            startGame(state.level);
-        });
+        ?.addEventListener(
+            "click",
+            () => startGame(state.level)
+        );
 
     document
         .getElementById("result-home")
-        ?.addEventListener("click", showHomeScreen);
+        ?.addEventListener(
+            "click",
+            showHomeScreen
+        );
 }
 
 function finishGame() {
@@ -674,7 +735,10 @@ function showHomeScreen() {
                 سه سطح بیازما!
             </div>
 
-            <button class="primary-btn" id="start-challenge">
+            <button
+                class="primary-btn"
+                id="start-challenge"
+            >
                 شروع چالش
             </button>
 
@@ -748,7 +812,10 @@ function showLevelScreen() {
 
             </div>
 
-            <button class="secondary-btn" id="level-back">
+            <button
+                class="secondary-btn"
+                id="level-back"
+            >
                 بازگشت
             </button>
 
@@ -758,18 +825,27 @@ function showLevelScreen() {
     document
         .querySelectorAll(".level-btn")
         .forEach(button => {
-            button.addEventListener("click", () => {
-                startGame(button.dataset.level);
-            });
+            button.addEventListener(
+                "click",
+                () => {
+                    startGame(
+                        button.dataset.level
+                    );
+                }
+            );
         });
 
     document
         .getElementById("level-back")
-        ?.addEventListener("click", showHomeScreen);
+        ?.addEventListener(
+            "click",
+            showHomeScreen
+        );
 }
 
 function injectStyles() {
-    const style = document.createElement("style");
+    const style =
+        document.createElement("style");
 
     style.textContent = `
         * {
@@ -899,7 +975,8 @@ function injectStyles() {
             grid-template-columns: 45px 1fr;
             grid-template-rows: auto auto;
             text-align: right;
-            box-shadow: 0 3px 14px rgba(0,0,0,.06);
+            box-shadow:
+                0 3px 14px rgba(0,0,0,.06);
         }
 
         .level-btn span {
@@ -976,7 +1053,8 @@ function injectStyles() {
             padding: 24px 20px;
             border-radius: 20px;
             background: #fff;
-            box-shadow: 0 4px 18px rgba(0,0,0,.06);
+            box-shadow:
+                0 4px 18px rgba(0,0,0,.06);
             margin-bottom: 18px;
         }
 
@@ -1074,7 +1152,8 @@ function injectStyles() {
         .result-stats {
             width: min(100%, 420px);
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns:
+                repeat(3, 1fr);
             gap: 8px;
             margin-bottom: 25px;
         }
@@ -1129,57 +1208,26 @@ function injectStyles() {
             }
         }
 
-        /* فقط ظاهر ساده برای افکت آماده Lottie */
+        /* فقط لایه نمایش انیمیشن آماده خارجی */
         #perfect-score-overlay {
             position: fixed;
             inset: 0;
             z-index: 999999;
-            background: rgba(10, 10, 18, .97);
+            background: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 1;
-            transition: opacity .5s ease;
+            transition: opacity .4s ease;
         }
 
         #perfect-score-overlay.hide {
             opacity: 0;
         }
 
-        .perfect-score-content {
-            width: min(92vw, 420px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-
-        #perfect-lottie {
-            width: min(78vw, 330px);
-            height: min(78vw, 330px);
-            margin-bottom: -25px;
-        }
-
-        .perfect-score-title {
-            color: #fff;
-            font-size: 25px;
-            font-weight: 900;
-            margin-top: 0;
-        }
-
-        .perfect-score-number {
-            color: #fff;
-            font-size: 58px;
-            line-height: 1.1;
-            font-weight: 1000;
-            margin-top: 8px;
-        }
-
-        .perfect-score-subtitle {
-            color: rgba(255,255,255,.78);
-            font-size: 15px;
-            margin-top: 8px;
+        .perfect-animation {
+            width: min(90vw, 500px);
+            height: min(90vw, 500px);
         }
 
         @media (max-width: 420px) {
@@ -1188,14 +1236,6 @@ function injectStyles() {
             }
 
             .result-score {
-                font-size: 50px;
-            }
-
-            .perfect-score-title {
-                font-size: 22px;
-            }
-
-            .perfect-score-number {
                 font-size: 50px;
             }
         }
@@ -1211,7 +1251,8 @@ function initializeSoroushWebApp() {
     try {
         if (
             window.SoroushWebApp &&
-            typeof window.SoroushWebApp.ready === "function"
+            typeof window.SoroushWebApp.ready ===
+                "function"
         ) {
             window.SoroushWebApp.ready();
         }
@@ -1223,7 +1264,9 @@ function initializeSoroushWebApp() {
     }
 }
 
-if (document.readyState === "loading") {
+if (
+    document.readyState === "loading"
+) {
     document.addEventListener(
         "DOMContentLoaded",
         initializeSoroushWebApp
