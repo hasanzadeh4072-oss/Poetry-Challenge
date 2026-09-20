@@ -7,9 +7,9 @@ const BASE_URL =
     "https://hasanzadeh4072-oss.github.io/Poetry-Challenge";
 
 const DATA_URLS = {
-    ashenaei: BASE_URL + "/ashenaei.json",
-    danaei: BASE_URL + "/danaei.json",
-    ostad: BASE_URL + "/Ostad.json"
+    ashenaei: `${BASE_URL}/ashenaei.json`,
+    danaei: `${BASE_URL}/danaei.json`,
+    ostad: `${BASE_URL}/Ostad.json`
 };
 
 const LEVEL_NAMES = {
@@ -33,55 +33,84 @@ const state = {
     gameActive: false
 };
 
-const app = document.getElementById("app");
+const homeScreen = document.getElementById("homeScreen");
+const gameScreen = document.getElementById("gameScreen");
+const resultScreen = document.getElementById("resultScreen");
+
+const levelName = document.getElementById("levelName");
+const scoreElement = document.getElementById("score");
+const questionNumber = document.getElementById("questionNumber");
+const questionText = document.getElementById("questionText");
+const optionsContainer = document.getElementById("options");
+const timerElement = document.getElementById("timer");
+
+const resultLevel = document.getElementById("resultLevel");
+const finalScore = document.getElementById("finalScore");
+const resultMessage = document.getElementById("resultMessage");
+
+const stopButton = document.getElementById("stopButton");
+const restartButton = document.getElementById("restartButton");
 
 function toPersianNumber(value) {
     return String(value).replace(
         /\d/g,
-        function (d) {
-            return "۰۱۲۳۴۵۶۷۸۹"[d];
-        }
+        digit => "۰۱۲۳۴۵۶۷۸۹"[digit]
     );
 }
 
-function showScreen(html) {
-    app.innerHTML = html;
+function showScreen(screen) {
+    [homeScreen, gameScreen, resultScreen].forEach(item => {
+        item.classList.remove("active");
+    });
+
+    screen.classList.add("active");
 }
 
 function shuffle(array) {
-    const result = array.slice();
+    const result = [...array];
 
     for (let i = result.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        const temp = result[i];
-        result[i] = result[j];
-        result[j] = temp;
+
+        [result[i], result[j]] =
+            [result[j], result[i]];
     }
 
     return result;
 }
 
 async function loadQuestions(level) {
+    const url = DATA_URLS[level];
+
+    if (!url) {
+        throw new Error("سطح نامعتبر است");
+    }
+
     const response = await fetch(
-        DATA_URLS[level] + "?v=" + Date.now(),
+        `${url}?v=${Date.now()}`,
         {
             cache: "no-store"
         }
     );
 
     if (!response.ok) {
-        throw new Error("خطا در دریافت بانک سؤال");
+        throw new Error(
+            `خطا در دریافت سؤال‌ها: ${response.status}`
+        );
     }
 
     const data = await response.json();
 
     if (!Array.isArray(data)) {
-        throw new Error("ساختار بانک سؤال صحیح نیست");
+        throw new Error(
+            "ساختار فایل سؤال‌ها نامعتبر است"
+        );
     }
 
-    const levelName = LEVEL_NAMES[level];
+    const selectedLevel =
+        LEVEL_NAMES[level];
 
-    return data.filter(function (question) {
+    return data.filter(question => {
         if (
             !question ||
             !question["سؤال"] ||
@@ -90,8 +119,17 @@ async function loadQuestions(level) {
             return false;
         }
 
+        /*
+         * فایل آشنایی در حال حاضر شامل سؤال‌هایی
+         * از چند سطح است؛ بنابراین فقط سؤال‌های
+         * متعلق به سطح انتخاب‌شده را برمی‌داریم.
+         *
+         * اگر فایل‌های دانایی و استادی فقط سؤال‌های
+         * همان سطح را داشته باشند، این فیلتر نیز
+         * بدون ایجاد مشکل عمل می‌کند.
+         */
         if (question["سطح"]) {
-            return question["سطح"] === levelName;
+            return question["سطح"] === selectedLevel;
         }
 
         return true;
@@ -99,326 +137,351 @@ async function loadQuestions(level) {
 }
 
 function getOptions(question) {
-    let options = [];
+    /*
+     * حالت استاندارد:
+     *
+     * "گزینه‌ها": [
+     *   "...",
+     *   "...",
+     *   "...",
+     *   "..."
+     * ]
+     */
+    let options = question["گزینه‌ها"];
 
-    if (
-        Array.isArray(question["گزینه‌ها"]) &&
-        question["گزینه‌ها"].length >= 2
-    ) {
-        options = question["گزینه‌ها"].slice();
-    } else if (question["نوع سؤال"] === "صحیح/غلط") {
-        options = ["صحیح", "غلط"];
-    } else {
-        let others = question["سایر گزینه‌های چالشی"];
+    if (Array.isArray(options)) {
+        options = options.filter(option => {
+            return (
+                option !== null &&
+                option !== undefined &&
+                String(option).trim() !== ""
+            );
+        });
 
-        if (typeof others === "string") {
-            try {
-                others = JSON.parse(others);
-            } catch (error) {
-                others = others
-                    .split(/[,،\n]/)
-                    .map(function (item) {
-                        return item.trim();
-                    })
-                    .filter(Boolean);
-            }
-        }
-
-        if (Array.isArray(others)) {
-            options = [
-                question["پاسخ صحیح"]
-            ].concat(others);
+        if (options.length >= 2) {
+            return options;
         }
     }
 
-    options = options
-        .map(function (item) {
-            return String(item).trim();
-        })
-        .filter(Boolean);
+    const correct =
+        question["پاسخ صحیح"];
 
-    options = options.filter(function (item, index) {
-        return options.indexOf(item) === index;
-    });
+    /*
+     * اگر نوع سؤال صحیح/غلط باشد،
+     * گزینه‌ها را مستقیماً می‌سازیم.
+     */
+    if (
+        question["نوع سؤال"] === "صحیح/غلط"
+    ) {
+        return [
+            "صحیح",
+            "غلط"
+        ];
+    }
 
-    return shuffle(options);
+    /*
+     * در فایل آشنایی:
+     *
+     * "سایر گزینه‌های چالشی":
+     * "گوش, زبان, صورت"
+     *
+     * بنابراین اگر مقدار رشته باشد،
+     * آن را به آرایه تبدیل می‌کنیم.
+     */
+    let others =
+        question["سایر گزینه‌های چالشی"];
+
+    if (typeof others === "string") {
+        others = others
+            .split(/[،,]/)
+            .map(option => option.trim())
+            .filter(option => {
+                return (
+                    option !== "" &&
+                    option !== "—" &&
+                    option !== "-"
+                );
+            });
+    } else if (Array.isArray(others)) {
+        others = others
+            .map(option => String(option).trim())
+            .filter(option => {
+                return (
+                    option !== "" &&
+                    option !== "—" &&
+                    option !== "-"
+                );
+            });
+    } else {
+        others = [];
+    }
+
+    /*
+     * گزینه صحیح + گزینه‌های غلط
+     */
+    const allOptions = [
+        correct,
+        ...others
+    ];
+
+    /*
+     * حذف گزینه‌های تکراری
+     */
+    const uniqueOptions = [
+        ...new Set(
+            allOptions.map(option =>
+                String(option).trim()
+            )
+        )
+    ];
+
+    return shuffle(uniqueOptions);
 }
 
-function startGame(level) {
-    if (!LEVEL_NAMES[level]) {
-        return;
-    }
-
+async function startGame(level) {
     clearTimer();
 
     state.level = level;
-    state.levelName = LEVEL_NAMES[level];
-    state.questions = [];
+    state.levelName =
+        LEVEL_NAMES[level] || level;
+
     state.currentQuestion = 0;
     state.score = 0;
     state.wrongAnswers = 0;
     state.correctAnswers = 0;
     state.unanswered = 0;
-    state.timeLeft = QUESTION_TIME;
-    state.answered = false;
+    state.questions = [];
     state.gameActive = false;
 
-    showScreen(
-        '<div class="loading-screen">' +
-            '<div class="loading-spinner"></div>' +
-            '<div>در حال آماده‌سازی چالش...</div>' +
-        '</div>'
-    );
+    levelName.textContent =
+        state.levelName;
 
-    loadQuestions(level)
-        .then(function (questions) {
-            if (questions.length < QUESTION_COUNT) {
-                throw new Error(
-                    "برای این سطح حداقل " +
-                    QUESTION_COUNT +
-                    " سؤال لازم است."
-                );
-            }
+    scoreElement.textContent =
+        toPersianNumber(0);
 
-            const selectedQuestions = shuffle(questions)
-                .slice(0, QUESTION_COUNT)
-                .map(function (question) {
-                    return {
-                        data: question,
-                        options: getOptions(question)
-                    };
-                });
+    showScreen(gameScreen);
 
-            selectedQuestions.forEach(function (question) {
-                if (question.options.length < 2) {
-                    throw new Error(
-                        "برخی از سؤال‌ها گزینه‌های کافی ندارند."
-                    );
-                }
-            });
+    questionText.textContent =
+        "در حال آماده‌سازی چالش...";
 
-            state.questions = selectedQuestions;
-            state.gameActive = true;
+    optionsContainer.innerHTML = "";
 
-            showQuestion();
-        })
-        .catch(function (error) {
-            state.gameActive = false;
+    try {
+        const allQuestions =
+            await loadQuestions(level);
 
-            showScreen(
-                '<div class="error-screen">' +
-                    '<div class="error-icon">⚠️</div>' +
-                    '<div class="error-title">خطا</div>' +
-                    '<div class="error-message">' +
-                        String(error.message || "خطای نامشخص") +
-                    '</div>' +
-                    '<button class="primary-btn" id="back-home">' +
-                        'بازگشت' +
-                    '</button>' +
-                '</div>'
+        if (
+            allQuestions.length <
+            QUESTION_COUNT
+        ) {
+            throw new Error(
+                `تعداد سؤال‌های سطح ${LEVEL_NAMES[level]} کافی نیست`
             );
+        }
 
-            const backButton =
-                document.getElementById("back-home");
+        state.questions =
+            shuffle(allQuestions)
+                .slice(0, QUESTION_COUNT)
+                .map(question => ({
+                    question,
+                    options: getOptions(question)
+                }));
 
-            if (backButton) {
-                backButton.addEventListener(
-                    "click",
-                    showHomeScreen
+        for (const item of state.questions) {
+            if (item.options.length < 2) {
+                throw new Error(
+                    "یکی از سؤال‌ها گزینه کافی ندارد"
                 );
             }
-        });
+        }
+
+        state.gameActive = true;
+
+        showQuestion();
+
+    } catch (error) {
+        console.error(
+            "START GAME ERROR:",
+            error
+        );
+
+        state.gameActive = false;
+
+        questionText.textContent =
+            "دریافت سؤال‌ها با مشکل مواجه شد.";
+
+        optionsContainer.innerHTML = "";
+
+        const retryButton =
+            document.createElement("button");
+
+        retryButton.className =
+            "primary-btn";
+
+        retryButton.textContent =
+            "🔄 تلاش دوباره";
+
+        retryButton.addEventListener(
+            "click",
+            () => startGame(level)
+        );
+
+        optionsContainer.appendChild(
+            retryButton
+        );
+    }
 }
 
 function showQuestion() {
     clearTimer();
 
-    const questionItem =
-        state.questions[state.currentQuestion];
+    if (!state.gameActive) {
+        return;
+    }
 
-    if (!questionItem) {
+    if (
+        state.currentQuestion >=
+        state.questions.length
+    ) {
         finishGame();
         return;
     }
 
-    const question = questionItem.data;
+    const item =
+        state.questions[
+            state.currentQuestion
+        ];
+
+    const question =
+        item.question;
 
     state.answered = false;
-    state.timeLeft = QUESTION_TIME;
+    state.timeLeft =
+        QUESTION_TIME;
 
-    const options = shuffle(questionItem.options);
+    questionNumber.textContent =
+        toPersianNumber(
+            state.currentQuestion + 1
+        );
 
-    const letters = "الفبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی";
+    questionText.textContent =
+        question["سؤال"];
 
-    showScreen(
-        '<div class="game-screen">' +
+    optionsContainer.innerHTML = "";
 
-            '<div class="game-header">' +
-                '<div class="level-badge">' +
-                    state.levelName +
-                '</div>' +
+    const options =
+        shuffle(item.options);
 
-                '<div class="question-counter">' +
-                    'سؤال ' +
-                    toPersianNumber(
-                        state.currentQuestion + 1
-                    ) +
-                    ' از ' +
-                    toPersianNumber(QUESTION_COUNT) +
-                '</div>' +
-            '</div>' +
+    options.forEach(option => {
+        const button =
+            document.createElement("button");
 
-            '<div class="score-row">' +
-                '<div>' +
-                    'امتیاز: ' +
-                    '<strong id="score-value">' +
-                        toPersianNumber(state.score) +
-                    '</strong>' +
-                '</div>' +
+        button.className =
+            "option-btn";
 
-                '<div class="timer" id="timer">' +
-                    toPersianNumber(state.timeLeft) +
-                '</div>' +
-            '</div>' +
+        button.type = "button";
 
-            '<div class="question-card">' +
-                '<div class="question-text">' +
-                    question["سؤال"] +
-                '</div>' +
-            '</div>' +
+        button.textContent =
+            String(option);
 
-            '<div class="options-container" id="options-container">' +
-                options.map(function (option, index) {
-                    return (
-                        '<button class="option-btn" ' +
-                            'data-option="' +
-                            encodeURIComponent(option) +
-                            '">' +
-
-                            '<span class="option-letter">' +
-                                (letters[index] || "") +
-                            '</span>' +
-
-                            '<span class="option-text">' +
-                                option +
-                            '</span>' +
-
-                        '</button>'
-                    );
-                }).join("") +
-            '</div>' +
-
-            '<button class="stop-btn" id="stop-game">' +
-                '⛔ توقف چالش' +
-            '</button>' +
-
-        '</div>'
-    );
-
-    const optionButtons =
-        document.querySelectorAll(".option-btn");
-
-    optionButtons.forEach(function (button) {
         button.addEventListener(
             "click",
-            function () {
-                const option =
-                    decodeURIComponent(
-                        button.getAttribute("data-option")
-                    );
-
-                answerQuestion(option, button);
+            () => {
+                answerQuestion(
+                    option,
+                    button
+                );
             }
+        );
+
+        optionsContainer.appendChild(
+            button
         );
     });
 
-    const stopButton =
-        document.getElementById("stop-game");
-
-    if (stopButton) {
-        stopButton.addEventListener(
-            "click",
-            stopGame
-        );
-    }
-
-    startTimer();
-}
-
-function startTimer() {
-    clearTimer();
-
-    state.timeLeft = QUESTION_TIME;
-
     updateTimer();
 
-    state.timer = setInterval(function () {
-        if (
-            !state.gameActive ||
-            state.answered
-        ) {
-            return;
-        }
+    state.timer =
+        setInterval(() => {
+            if (!state.gameActive) {
+                clearTimer();
+                return;
+            }
 
-        state.timeLeft--;
+            state.timeLeft--;
 
-        updateTimer();
+            updateTimer();
 
-        if (state.timeLeft <= 0) {
-            timeExpired();
-        }
-    }, 1000);
+            if (
+                state.timeLeft <= 0
+            ) {
+                clearTimer();
+                timeExpired();
+            }
+        }, 1000);
 }
 
 function updateTimer() {
-    const timer =
-        document.getElementById("timer");
+    const minutes =
+        Math.floor(
+            state.timeLeft / 60
+        );
 
-    if (!timer) {
-        return;
-    }
+    const seconds =
+        state.timeLeft % 60;
 
-    timer.textContent = toPersianNumber(
-        Math.max(0, state.timeLeft)
+    timerElement.textContent =
+        `${toPersianNumber(minutes)}:${toPersianNumber(
+            String(seconds).padStart(2, "0")
+        )}`;
+
+    timerElement.classList.remove(
+        "warning",
+        "danger"
     );
 
     if (state.timeLeft <= 10) {
-        timer.classList.add("danger");
-    } else {
-        timer.classList.remove("danger");
+        timerElement.classList.add(
+            "danger"
+        );
+    } else if (
+        state.timeLeft <= 30
+    ) {
+        timerElement.classList.add(
+            "warning"
+        );
     }
 }
 
-function normalizeText(text) {
-    return String(
-        text === null || text === undefined
-            ? ""
-            : text
-    )
+function normalizeText(value) {
+    return String(value ?? "")
         .trim()
         .replace(/ي/g, "ی")
-        .replace(/ى/g, "ی")
-        .replace(/ك/g, "ک")
-        .replace(/ۀ/g, "ه")
-        .replace(/ة/g, "ه")
-        .replace(/\u200c/g, " ")
-        .replace(/\s+/g, " ");
+        .replace(/ك/g, "ک");
 }
 
 function getCorrectAnswer(question) {
-    return normalizeText(
-        question["پاسخ صحیح"]
-    );
+    return question["پاسخ صحیح"] || "";
 }
 
-function isCorrect(option, question) {
+function isCorrect(
+    selectedAnswer,
+    question
+) {
     return (
-        normalizeText(option) ===
-        getCorrectAnswer(question)
+        normalizeText(
+            selectedAnswer
+        ) ===
+        normalizeText(
+            getCorrectAnswer(question)
+        )
     );
 }
 
-function answerQuestion(option, clickedButton) {
+function answerQuestion(
+    selectedAnswer,
+    selectedButton
+) {
     if (
         !state.gameActive ||
         state.answered
@@ -427,56 +490,78 @@ function answerQuestion(option, clickedButton) {
     }
 
     state.answered = true;
+
     clearTimer();
 
-    const questionItem =
-        state.questions[state.currentQuestion];
+    const item =
+        state.questions[
+            state.currentQuestion
+        ];
 
-    const question = questionItem.data;
+    const question =
+        item.question;
 
-    document
-        .querySelectorAll(".option-btn")
-        .forEach(function (button) {
-            button.disabled = true;
-        });
+    const correct =
+        isCorrect(
+            selectedAnswer,
+            question
+        );
 
-    if (isCorrect(option, question)) {
-        state.correctAnswers++;
+    const buttons =
+        optionsContainer.querySelectorAll(
+            ".option-btn"
+        );
+
+    buttons.forEach(button => {
+        button.disabled = true;
+    });
+
+    if (correct) {
         state.score += 100;
+        state.correctAnswers++;
 
-        clickedButton.classList.add("correct");
+        selectedButton.classList.add(
+            "correct"
+        );
+
     } else {
         state.wrongAnswers++;
 
-        if (state.wrongAnswers % 2 === 0) {
+        selectedButton.classList.add(
+            "wrong"
+        );
+
+        if (
+            state.wrongAnswers % 2 === 0
+        ) {
             state.score -= 15;
         }
 
-        clickedButton.classList.add("wrong");
+        const correctAnswer =
+            getCorrectAnswer(question);
 
-        document
-            .querySelectorAll(".option-btn")
-            .forEach(function (button) {
-                const value =
-                    decodeURIComponent(
-                        button.getAttribute("data-option")
-                    );
-
-                if (isCorrect(value, question)) {
-                    button.classList.add("correct");
-                }
-            });
+        buttons.forEach(button => {
+            if (
+                normalizeText(
+                    button.textContent
+                ) ===
+                normalizeText(
+                    correctAnswer
+                )
+            ) {
+                button.classList.add(
+                    "correct"
+                );
+            }
+        });
     }
 
-    const scoreValue =
-        document.getElementById("score-value");
+    scoreElement.textContent =
+        toPersianNumber(
+            state.score
+        );
 
-    if (scoreValue) {
-        scoreValue.textContent =
-            toPersianNumber(state.score);
-    }
-
-    setTimeout(function () {
+    setTimeout(() => {
         nextQuestion();
     }, 700);
 }
@@ -492,15 +577,16 @@ function timeExpired() {
     state.answered = true;
     state.unanswered++;
 
-    clearTimer();
+    const buttons =
+        optionsContainer.querySelectorAll(
+            ".option-btn"
+        );
 
-    document
-        .querySelectorAll(".option-btn")
-        .forEach(function (button) {
-            button.disabled = true;
-        });
+    buttons.forEach(button => {
+        button.disabled = true;
+    });
 
-    setTimeout(function () {
+    setTimeout(() => {
         nextQuestion();
     }, 500);
 }
@@ -514,284 +600,18 @@ function nextQuestion() {
 
     if (
         state.currentQuestion >=
-        QUESTION_COUNT
+        state.questions.length
     ) {
         finishGame();
-        return;
+    } else {
+        showQuestion();
     }
-
-    showQuestion();
 }
 
 function clearTimer() {
-    if (state.timer) {
+    if (state.timer !== null) {
         clearInterval(state.timer);
         state.timer = null;
-    }
-}
-
-/* =========================================================
-   PERFECT SCORE — READY-MADE LOTTIE
-   ========================================================= */
-
-const PERFECT_ANIMATION_URL =
-    "https://assets3.lottiefiles.com/packages/lf20_UJNc2t.json";
-
-function loadLottiePlayer() {
-    return new Promise(function (resolve) {
-        if (
-            window.customElements &&
-            window.customElements.get &&
-            window.customElements.get("lottie-player")
-        ) {
-            resolve(true);
-            return;
-        }
-
-        const existing =
-            document.querySelector(
-                'script[data-lottie-player="true"]'
-            );
-
-        if (existing) {
-            existing.addEventListener(
-                "load",
-                function () {
-                    resolve(true);
-                }
-            );
-
-            existing.addEventListener(
-                "error",
-                function () {
-                    resolve(false);
-                }
-            );
-
-            return;
-        }
-
-        const script =
-            document.createElement("script");
-
-        script.src =
-            "https://unpkg.com/@lottiefiles/lottie-player@2.0.12/dist/lottie-player.js";
-
-        script.setAttribute(
-            "data-lottie-player",
-            "true"
-        );
-
-        script.onload = function () {
-            resolve(true);
-        };
-
-        script.onerror = function () {
-            resolve(false);
-        };
-
-        document.head.appendChild(script);
-    });
-}
-
-function showPerfectScoreAnimation() {
-    clearTimer();
-
-    const overlay =
-        document.createElement("div");
-
-    overlay.id =
-        "perfect-score-overlay";
-
-    overlay.innerHTML =
-        '<div class="perfect-score-content">' +
-
-            '<div id="perfect-lottie-container">' +
-                '<div class="lottie-loading">' +
-                    '✨' +
-                '</div>' +
-            '</div>' +
-
-            '<div class="perfect-score-title">' +
-                'امتیاز کامل!' +
-            '</div>' +
-
-            '<div class="perfect-score-number">' +
-                '۷۰۰' +
-            '</div>' +
-
-            '<div class="perfect-score-subtitle">' +
-                'هر ۷ سؤال را درست پاسخ دادی!' +
-            '</div>' +
-
-        '</div>';
-
-    document.body.appendChild(overlay);
-
-    loadLottiePlayer().then(function (loaded) {
-        const container =
-            document.getElementById(
-                "perfect-lottie-container"
-            );
-
-        if (!container) {
-            return;
-        }
-
-        if (!loaded) {
-            container.innerHTML = "";
-            return;
-        }
-
-        const player =
-            document.createElement(
-                "lottie-player"
-            );
-
-        player.setAttribute(
-            "src",
-            PERFECT_ANIMATION_URL
-        );
-
-        player.setAttribute(
-            "background",
-            "transparent"
-        );
-
-        player.setAttribute(
-            "speed",
-            "1"
-        );
-
-        player.setAttribute(
-            "loop",
-            "false"
-        );
-
-        player.setAttribute(
-            "autoplay",
-            ""
-        );
-
-        player.id = "perfect-lottie";
-
-        container.innerHTML = "";
-        container.appendChild(player);
-    });
-
-    setTimeout(function () {
-        overlay.classList.add("hide");
-
-        setTimeout(function () {
-            if (overlay.parentNode) {
-                overlay.parentNode.removeChild(
-                    overlay
-                );
-            }
-
-            showResultScreen();
-        }, 500);
-    }, 5000);
-}
-
-function showResultScreen() {
-    let resultMessage = "";
-
-    if (state.score >= 600) {
-        resultMessage = "فوق‌العاده! 🌟";
-    } else if (state.score >= 400) {
-        resultMessage = "عالی! 👏";
-    } else if (state.score >= 200) {
-        resultMessage = "خوب بود! 🌿";
-    } else {
-        resultMessage =
-            "این پایان راه نیست؛ دوباره تلاش کن. 💚";
-    }
-
-    showScreen(
-        '<div class="result-screen">' +
-
-            '<div class="result-icon">🏆</div>' +
-
-            '<div class="result-title">' +
-                'پایان چالش' +
-            '</div>' +
-
-            '<div class="result-level">' +
-                'سطح ' +
-                state.levelName +
-            '</div>' +
-
-            '<div class="result-score">' +
-                toPersianNumber(state.score) +
-            '</div>' +
-
-            '<div class="result-message">' +
-                resultMessage +
-            '</div>' +
-
-            '<div class="result-stats">' +
-
-                '<div class="result-stat">' +
-                    '<span>پاسخ صحیح</span>' +
-                    '<strong>' +
-                        toPersianNumber(
-                            state.correctAnswers
-                        ) +
-                    '</strong>' +
-                '</div>' +
-
-                '<div class="result-stat">' +
-                    '<span>پاسخ غلط</span>' +
-                    '<strong>' +
-                        toPersianNumber(
-                            state.wrongAnswers
-                        ) +
-                    '</strong>' +
-                '</div>' +
-
-                '<div class="result-stat">' +
-                    '<span>بدون پاسخ</span>' +
-                    '<strong>' +
-                        toPersianNumber(
-                            state.unanswered
-                        ) +
-                    '</strong>' +
-                '</div>' +
-
-            '</div>' +
-
-            '<button class="primary-btn" id="play-again">' +
-                '🔄 دوباره بازی کن' +
-            '</button>' +
-
-            '<button class="secondary-btn" id="result-home">' +
-                '🏠 بازگشت' +
-            '</button>' +
-
-        '</div>'
-    );
-
-    const playAgain =
-        document.getElementById("play-again");
-
-    if (playAgain) {
-        playAgain.addEventListener(
-            "click",
-            function () {
-                startGame(state.level);
-            }
-        );
-    }
-
-    const resultHome =
-        document.getElementById("result-home");
-
-    if (resultHome) {
-        resultHome.addEventListener(
-            "click",
-            showHomeScreen
-        );
     }
 }
 
@@ -800,615 +620,109 @@ function finishGame() {
 
     state.gameActive = false;
 
-    if (state.score === 700) {
-        showPerfectScoreAnimation();
-        return;
+    resultLevel.textContent =
+        state.levelName;
+
+    finalScore.textContent =
+        toPersianNumber(
+            state.score
+        );
+
+    let message;
+
+    if (state.score >= 600) {
+        message =
+            "فوق‌العاده! 🌟";
+    } else if (
+        state.score >= 400
+    ) {
+        message =
+            "عالی! 👏";
+    } else if (
+        state.score >= 200
+    ) {
+        message =
+            "خوب بود! 🌿";
+    } else {
+        message =
+            "این پایان راه نیست؛ دوباره تلاش کن. 💚";
     }
 
-    showResultScreen();
+    resultMessage.textContent =
+        message;
+
+    showScreen(
+        resultScreen
+    );
 }
 
 function stopGame() {
     clearTimer();
 
     state.gameActive = false;
-    state.answered = true;
-
-    showHomeScreen();
-}
-
-function showHomeScreen() {
-    clearTimer();
-
-    state.gameActive = false;
 
     showScreen(
-        '<div class="home-screen">' +
-
-            '<div class="home-logo">📚</div>' +
-
-            '<div class="home-title">' +
-                'چالش شعرانه' +
-            '</div>' +
-
-            '<div class="home-description">' +
-                'دانسته‌های ادبی و شعری خودت را در ' +
-                'سه سطح بیازما!' +
-            '</div>' +
-
-            '<button class="primary-btn" id="start-challenge">' +
-                'شروع چالش' +
-            '</button>' +
-
-            '<div class="home-menu">' +
-
-                '<button class="menu-btn">' +
-                    '💬 ارتباط با مدیر' +
-                '</button>' +
-
-                '<button class="menu-btn">' +
-                    '🌿 درباره ما' +
-                '</button>' +
-
-                '<button class="menu-btn">' +
-                    '🤖 سایر بات‌ها' +
-                '</button>' +
-
-            '</div>' +
-
-        '</div>'
+        homeScreen
     );
+}
 
-    const startButton =
-        document.getElementById(
-            "start-challenge"
-        );
-
-    if (startButton) {
-        startButton.addEventListener(
+document
+    .querySelectorAll(".level-btn")
+    .forEach(button => {
+        button.addEventListener(
             "click",
-            showLevelScreen
+            () => {
+                const level =
+                    button.dataset.level;
+
+                if (level) {
+                    startGame(level);
+                }
+            }
         );
-    }
-}
-
-function showLevelScreen() {
-    showScreen(
-        '<div class="level-screen">' +
-
-            '<div class="level-title">' +
-                'انتخاب سطح' +
-            '</div>' +
-
-            '<div class="level-description">' +
-                'سطح موردنظر خود را انتخاب کنید' +
-            '</div>' +
-
-            '<div class="levels">' +
-
-                '<button class="level-btn" data-level="ashenaei">' +
-                    '<span>🌱</span>' +
-                    '<strong>آشنایی</strong>' +
-                    '<small>سطح مقدماتی</small>' +
-                '</button>' +
-
-                '<button class="level-btn" data-level="danaei">' +
-                    '<span>📖</span>' +
-                    '<strong>دانایی</strong>' +
-                    '<small>سطح متوسط</small>' +
-                '</button>' +
-
-                '<button class="level-btn" data-level="ostad">' +
-                    '<span>🎓</span>' +
-                    '<strong>استادی</strong>' +
-                    '<small>سطح پیشرفته</small>' +
-                '</button>' +
-
-            '</div>' +
-
-            '<button class="secondary-btn" id="level-back">' +
-                'بازگشت' +
-            '</button>' +
-
-        '</div>'
-    );
-
-    /*
-     * استفاده از یک listener واحد روی خود app
-     * تا کلیک سطح در WebView سروش پایدارتر باشد.
-     */
-    const levelButtons =
-        document.querySelectorAll(".level-btn");
-
-    levelButtons.forEach(function (button) {
-        button.onclick = function () {
-            const level =
-                button.getAttribute("data-level");
-
-            startGame(level);
-        };
     });
 
-    const levelBack =
-        document.getElementById("level-back");
+stopButton.addEventListener(
+    "click",
+    stopGame
+);
 
-    if (levelBack) {
-        levelBack.onclick = showHomeScreen;
+restartButton.addEventListener(
+    "click",
+    () => {
+        showScreen(homeScreen);
     }
-}
-
-function injectStyles() {
-    const style =
-        document.createElement("style");
-
-    style.textContent = `
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-            font-family:
-                Vazirmatn,
-                Tahoma,
-                Arial,
-                sans-serif;
-            direction: rtl;
-            background: #f7f7f7;
-            color: #222;
-        }
-
-        button {
-            font-family: inherit;
-        }
-
-        .home-screen,
-        .level-screen,
-        .game-screen,
-        .result-screen,
-        .error-screen,
-        .loading-screen {
-            min-height: 100vh;
-            padding: 24px 18px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .home-logo {
-            font-size: 64px;
-            margin-bottom: 12px;
-        }
-
-        .home-title {
-            font-size: 30px;
-            font-weight: 900;
-            margin-bottom: 12px;
-        }
-
-        .home-description {
-            max-width: 420px;
-            text-align: center;
-            line-height: 2;
-            color: #666;
-            margin-bottom: 28px;
-        }
-
-        .primary-btn,
-        .secondary-btn,
-        .menu-btn,
-        .stop-btn,
-        .level-btn {
-            border: 0;
-            cursor: pointer;
-            transition: .2s ease;
-        }
-
-        .primary-btn {
-            width: min(100%, 360px);
-            padding: 15px 22px;
-            border-radius: 16px;
-            background: #222;
-            color: #fff;
-            font-size: 17px;
-            font-weight: 800;
-        }
-
-        .secondary-btn {
-            width: min(100%, 360px);
-            margin-top: 12px;
-            padding: 13px 20px;
-            border-radius: 15px;
-            background: #e9e9e9;
-            color: #333;
-            font-size: 16px;
-        }
-
-        .home-menu {
-            width: min(100%, 360px);
-            margin-top: 25px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .menu-btn {
-            padding: 13px;
-            border-radius: 14px;
-            background: #fff;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .level-title {
-            font-size: 28px;
-            font-weight: 900;
-            margin-bottom: 8px;
-        }
-
-        .level-description {
-            color: #777;
-            margin-bottom: 25px;
-        }
-
-        .levels {
-            width: min(100%, 420px);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .level-btn {
-            width: 100%;
-            padding: 18px;
-            border-radius: 18px;
-            background: #fff;
-            display: grid;
-            grid-template-columns: 45px 1fr;
-            grid-template-rows: auto auto;
-            text-align: right;
-            box-shadow: 0 3px 14px rgba(0,0,0,.06);
-        }
-
-        .level-btn span {
-            grid-row: 1 / 3;
-            font-size: 30px;
-            align-self: center;
-        }
-
-        .level-btn strong {
-            font-size: 18px;
-        }
-
-        .level-btn small {
-            margin-top: 5px;
-            color: #888;
-        }
-
-        .game-screen {
-            justify-content: flex-start;
-            padding-top: 20px;
-        }
-
-        .game-header,
-        .score-row {
-            width: min(100%, 600px);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .game-header {
-            margin-bottom: 15px;
-        }
-
-        .level-badge {
-            background: #222;
-            color: #fff;
-            padding: 7px 13px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .question-counter {
-            color: #777;
-            font-size: 14px;
-        }
-
-        .score-row {
-            margin-bottom: 18px;
-            color: #555;
-        }
-
-        .score-row strong {
-            color: #111;
-        }
-
-        .timer {
-            min-width: 48px;
-            text-align: center;
-            padding: 7px 10px;
-            border-radius: 10px;
-            background: #fff;
-            font-weight: 900;
-        }
-
-        .timer.danger {
-            background: #ffe7e7;
-            color: #c00;
-        }
-
-        .question-card {
-            width: min(100%, 600px);
-            padding: 24px 20px;
-            border-radius: 20px;
-            background: #fff;
-            box-shadow: 0 4px 18px rgba(0,0,0,.06);
-            margin-bottom: 18px;
-        }
-
-        .question-text {
-            font-size: 19px;
-            line-height: 2;
-            font-weight: 800;
-            text-align: center;
-        }
-
-        .options-container {
-            width: min(100%, 600px);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .option-btn {
-            width: 100%;
-            border: 2px solid #e7e7e7;
-            background: #fff;
-            border-radius: 16px;
-            padding: 14px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-align: right;
-            cursor: pointer;
-            font-size: 15px;
-            line-height: 1.8;
-        }
-
-        .option-btn:disabled {
-            cursor: default;
-        }
-
-        .option-letter {
-            width: 32px;
-            height: 32px;
-            flex: 0 0 32px;
-            border-radius: 50%;
-            background: #f0f0f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-        }
-
-        .option-btn.correct {
-            border-color: #39a95c;
-            background: #eaf8ee;
-        }
-
-        .option-btn.wrong {
-            border-color: #dc4c4c;
-            background: #fff0f0;
-        }
-
-        .stop-btn {
-            margin-top: 18px;
-            padding: 10px 18px;
-            border-radius: 12px;
-            background: transparent;
-            color: #888;
-            font-size: 13px;
-        }
-
-        .result-icon {
-            font-size: 64px;
-            margin-bottom: 10px;
-        }
-
-        .result-title {
-            font-size: 28px;
-            font-weight: 900;
-        }
-
-        .result-level {
-            color: #777;
-            margin-top: 8px;
-        }
-
-        .result-score {
-            font-size: 58px;
-            font-weight: 1000;
-            margin: 18px 0 5px;
-        }
-
-        .result-message {
-            font-size: 18px;
-            font-weight: 800;
-            margin-bottom: 25px;
-        }
-
-        .result-stats {
-            width: min(100%, 420px);
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 25px;
-        }
-
-        .result-stat {
-            background: #fff;
-            border-radius: 14px;
-            padding: 12px 5px;
-            text-align: center;
-        }
-
-        .result-stat span {
-            display: block;
-            font-size: 11px;
-            color: #888;
-            margin-bottom: 5px;
-        }
-
-        .result-stat strong {
-            font-size: 18px;
-        }
-
-        .error-icon {
-            font-size: 50px;
-        }
-
-        .error-title {
-            font-size: 25px;
-            font-weight: 900;
-            margin: 12px 0;
-        }
-
-        .error-message {
-            text-align: center;
-            color: #777;
-            margin-bottom: 20px;
-        }
-
-        .loading-spinner {
-            width: 42px;
-            height: 42px;
-            border: 4px solid #ddd;
-            border-top-color: #222;
-            border-radius: 50%;
-            animation: spin .8s linear infinite;
-            margin-bottom: 15px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        #perfect-score-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 999999;
-            background: rgba(10, 10, 18, .97);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 1;
-            transition: opacity .5s ease;
-        }
-
-        #perfect-score-overlay.hide {
-            opacity: 0;
-        }
-
-        .perfect-score-content {
-            width: min(92vw, 420px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-
-        #perfect-lottie-container {
-            width: min(78vw, 330px);
-            height: min(78vw, 330px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: -25px;
-        }
-
-        #perfect-lottie {
-            width: 100%;
-            height: 100%;
-        }
-
-        .lottie-loading {
-            font-size: 55px;
-        }
-
-        .perfect-score-title {
-            color: #fff;
-            font-size: 25px;
-            font-weight: 900;
-        }
-
-        .perfect-score-number {
-            color: #fff;
-            font-size: 58px;
-            line-height: 1.1;
-            font-weight: 1000;
-            margin-top: 8px;
-        }
-
-        .perfect-score-subtitle {
-            color: rgba(255,255,255,.78);
-            font-size: 15px;
-            margin-top: 8px;
-        }
-
-        @media (max-width: 420px) {
-            .question-text {
-                font-size: 17px;
-            }
-
-            .result-score {
-                font-size: 50px;
-            }
-
-            .perfect-score-title {
-                font-size: 22px;
-            }
-
-            .perfect-score-number {
-                font-size: 50px;
-            }
-        }
-    `;
-
-    document.head.appendChild(style);
-}
+);
 
 function initializeSoroushWebApp() {
-    injectStyles();
-    showHomeScreen();
-
     try {
         if (
-            window.SoroushWebApp &&
-            typeof window.SoroushWebApp.ready === "function"
+            window.Soroush &&
+            window.Soroush.WebApp
         ) {
-            window.SoroushWebApp.ready();
+            const webApp =
+                window.Soroush.WebApp;
+
+            if (
+                typeof webApp.ready ===
+                "function"
+            ) {
+                webApp.ready();
+            }
+
+            if (
+                typeof webApp.expand ===
+                "function"
+            ) {
+                webApp.expand();
+            }
         }
     } catch (error) {
-        console.warn(
-            "Soroush WebApp initialization warning:",
+        console.error(
+            "Soroush WebApp initialization error:",
             error
         );
     }
 }
 
-if (document.readyState === "loading") {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeSoroushWebApp
-    );
-} else {
-    initializeSoroushWebApp();
-}
-```0
+initializeSoroushWebApp();
