@@ -3,7 +3,11 @@
 const QUESTION_COUNT = 7;
 const QUESTION_TIME = 90;
 
-const API_URL = "/api";
+const DATA_URLS = {
+    ashenaei: "./ashenaei.json",
+    danaei: "./danaei.json",
+    ostad: "./Ostad.json"
+};
 
 const LEVEL_NAMES = {
     ashenaei: "آشنایی",
@@ -67,9 +71,15 @@ function shuffle(array) {
 }
 
 async function loadQuestions(level) {
-    const response = await fetch(
-        `${API_URL}/questions?level=${encodeURIComponent(level)}`
-    );
+    const url = DATA_URLS[level];
+
+    if (!url) {
+        throw new Error("سطح نامعتبر است");
+    }
+
+    const response = await fetch(url, {
+        cache: "no-store"
+    });
 
     if (!response.ok) {
         throw new Error("خطا در دریافت سؤال‌ها");
@@ -77,11 +87,11 @@ async function loadQuestions(level) {
 
     const data = await response.json();
 
-    if (!data || !Array.isArray(data.questions)) {
+    if (!Array.isArray(data)) {
         throw new Error("ساختار سؤال‌ها نامعتبر است");
     }
 
-    return data.questions;
+    return data;
 }
 
 async function startGame(level) {
