@@ -5,12 +5,9 @@ import threading
 import time
 
 import requests
-from flask import Flask, request, send_from_directory, jsonify
+from flask import Flask, request
 
 app = Flask(__name__)
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MINIAPP_DIR = os.path.join(BASE_DIR, "miniapp")
 
 TOKEN = os.getenv("SOROUSH_TOKEN")
 
@@ -267,7 +264,7 @@ def load_questions():
     for level, filename in LEVEL_FILES.items():
         try:
             with open(
-                os.path.join(BASE_DIR, filename),
+                filename,
                 "r",
                 encoding="utf-8"
             ) as f:
@@ -1462,83 +1459,6 @@ def handle_update(update):
     )
 
 
-# =========================
-# Mini App
-# =========================
-
-@app.route("/", methods=["GET"])
-def home():
-    return "Poetry Challenge Bot is running."
-
-
-@app.route("/test", methods=["GET"])
-def test():
-    return "Soroush Mini App Test OK", 200
-
-
-@app.route("/miniapp", methods=["GET"])
-@app.route("/miniapp/", methods=["GET"])
-def miniapp_index():
-    return send_from_directory(
-        MINIAPP_DIR,
-        "index.html"
-    )
-
-
-@app.route("/miniapp/<path:filename>", methods=["GET"])
-def miniapp_static(filename):
-    return send_from_directory(
-        MINIAPP_DIR,
-        filename
-    )
-
-
-@app.route("/api/questions", methods=["GET"])
-def miniapp_questions():
-    level = request.args.get(
-        "level",
-        ""
-    ).strip().lower()
-
-    if level not in QUESTIONS:
-        return jsonify({
-            "ok": False,
-            "error": "سطح نامعتبر است."
-        }), 400
-
-    available_questions = QUESTIONS[level]
-
-    if len(available_questions) < QUESTION_COUNT:
-        return jsonify({
-            "ok": False,
-            "error": "تعداد سؤال‌های این سطح کافی نیست."
-        }), 400
-
-    result = []
-
-    for question in available_questions:
-        result.append({
-            "question": question.get(
-                "سؤال",
-                ""
-            ),
-            "correct_answer": question.get(
-                "پاسخ صحیح",
-                ""
-            ),
-            "options": question.get(
-                "گزینه‌ها",
-                []
-            )
-        })
-
-    return jsonify({
-        "ok": True,
-        "level": level,
-        "questions": result
-    })
-
-
 @app.route(
     "/webhook",
     methods=["POST"]
@@ -1577,4 +1497,4 @@ if __name__ == "__main__":
                 5000
             )
         )
-    )
+        )
