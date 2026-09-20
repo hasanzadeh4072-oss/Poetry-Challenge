@@ -51,7 +51,8 @@ const resultMessage = document.getElementById("resultMessage");
 const stopButton = document.getElementById("stopButton");
 const restartButton = document.getElementById("restartButton");
 
-let perfectAnimationStyleAdded = false;
+let confettiReady = false;
+let perfectStyleAdded = false;
 
 
 /* =========================================================
@@ -98,22 +99,90 @@ function shuffle(array) {
 
 
 /* =========================================================
+دریافت کتابخانه کنفتی
+========================================================= */
+
+function loadConfettiLibrary() {
+
+    if (window.confetti) {
+        confettiReady = true;
+        return Promise.resolve();
+    }
+
+    if (
+        document.getElementById(
+            "hcg-confetti-library"
+        )
+    ) {
+        return new Promise(resolve => {
+
+            const check =
+                setInterval(() => {
+
+                    if (window.confetti) {
+                        clearInterval(check);
+                        confettiReady = true;
+                        resolve();
+                    }
+
+                }, 50);
+
+            setTimeout(() => {
+                clearInterval(check);
+                resolve();
+            }, 5000);
+
+        });
+    }
+
+    return new Promise(resolve => {
+
+        const script =
+            document.createElement("script");
+
+        script.id =
+            "hcg-confetti-library";
+
+        script.src =
+            "https://cdn.jsdelivr.net/npm/hcg-confetti-cannons@1/hcg-confetti-cannons.min.js";
+
+        script.onload = () => {
+            confettiReady = true;
+            resolve();
+        };
+
+        script.onerror = () => {
+            console.warn(
+                "Confetti library could not be loaded."
+            );
+
+            resolve();
+        };
+
+        document.head.appendChild(script);
+    });
+}
+
+
+/* =========================================================
 دریافت سؤال‌ها
 ========================================================= */
 
 async function loadQuestions(level) {
+
     const url = DATA_URLS[level];
 
     if (!url) {
         throw new Error("سطح نامعتبر است");
     }
 
-    const response = await fetch(
-        `${url}?v=${Date.now()}`,
-        {
-            cache: "no-store"
-        }
-    );
+    const response =
+        await fetch(
+            `${url}?v=${Date.now()}`,
+            {
+                cache: "no-store"
+            }
+        );
 
     if (!response.ok) {
         throw new Error(
@@ -121,7 +190,8 @@ async function loadQuestions(level) {
         );
     }
 
-    const data = await response.json();
+    const data =
+        await response.json();
 
     if (!Array.isArray(data)) {
         throw new Error(
@@ -133,6 +203,7 @@ async function loadQuestions(level) {
         LEVEL_NAMES[level];
 
     return data.filter(question => {
+
         if (
             !question ||
             !question["سؤال"] ||
@@ -142,7 +213,10 @@ async function loadQuestions(level) {
         }
 
         if (question["سطح"]) {
-            return question["سطح"] === selectedLevel;
+            return (
+                question["سطح"] ===
+                selectedLevel
+            );
         }
 
         return true;
@@ -155,16 +229,21 @@ async function loadQuestions(level) {
 ========================================================= */
 
 function getOptions(question) {
-    let options = question["گزینه‌ها"];
+
+    let options =
+        question["گزینه‌ها"];
 
     if (Array.isArray(options)) {
-        options = options.filter(option => {
-            return (
-                option !== null &&
-                option !== undefined &&
-                String(option).trim() !== ""
-            );
-        });
+
+        options =
+            options.filter(option => {
+
+                return (
+                    option !== null &&
+                    option !== undefined &&
+                    String(option).trim() !== ""
+                );
+            });
 
         if (options.length >= 2) {
             return options;
@@ -175,7 +254,8 @@ function getOptions(question) {
         question["پاسخ صحیح"];
 
     if (
-        question["نوع سؤال"] === "صحیح/غلط"
+        question["نوع سؤال"] ===
+        "صحیح/غلط"
     ) {
         return [
             "صحیح",
@@ -187,27 +267,40 @@ function getOptions(question) {
         question["سایر گزینه‌های چالشی"];
 
     if (typeof others === "string") {
-        others = others
-            .split(/[،,]/)
-            .map(option => option.trim())
-            .filter(option => {
-                return (
-                    option !== "" &&
-                    option !== "—" &&
-                    option !== "-"
-                );
-            });
+
+        others =
+            others
+                .split(/[،,]/)
+                .map(option =>
+                    option.trim()
+                )
+                .filter(option => {
+
+                    return (
+                        option !== "" &&
+                        option !== "—" &&
+                        option !== "-"
+                    );
+                });
+
     } else if (Array.isArray(others)) {
-        others = others
-            .map(option => String(option).trim())
-            .filter(option => {
-                return (
-                    option !== "" &&
-                    option !== "—" &&
-                    option !== "-"
-                );
-            });
+
+        others =
+            others
+                .map(option =>
+                    String(option).trim()
+                )
+                .filter(option => {
+
+                    return (
+                        option !== "" &&
+                        option !== "—" &&
+                        option !== "-"
+                    );
+                });
+
     } else {
+
         others = [];
     }
 
@@ -233,9 +326,11 @@ function getOptions(question) {
 ========================================================= */
 
 async function startGame(level) {
+
     clearTimer();
 
     state.level = level;
+
     state.levelName =
         LEVEL_NAMES[level] || level;
 
@@ -261,6 +356,7 @@ async function startGame(level) {
     optionsContainer.innerHTML = "";
 
     try {
+
         const allQuestions =
             await loadQuestions(level);
 
@@ -275,14 +371,24 @@ async function startGame(level) {
 
         state.questions =
             shuffle(allQuestions)
-                .slice(0, QUESTION_COUNT)
+                .slice(
+                    0,
+                    QUESTION_COUNT
+                )
                 .map(question => ({
                     question,
-                    options: getOptions(question)
+                    options:
+                        getOptions(question)
                 }));
 
-        for (const item of state.questions) {
-            if (item.options.length < 2) {
+        for (
+            const item
+            of state.questions
+        ) {
+
+            if (
+                item.options.length < 2
+            ) {
                 throw new Error(
                     "یکی از سؤال‌ها گزینه کافی ندارد"
                 );
@@ -294,6 +400,7 @@ async function startGame(level) {
         showQuestion();
 
     } catch (error) {
+
         console.error(
             "START GAME ERROR:",
             error
@@ -307,7 +414,9 @@ async function startGame(level) {
         optionsContainer.innerHTML = "";
 
         const retryButton =
-            document.createElement("button");
+            document.createElement(
+                "button"
+            );
 
         retryButton.className =
             "primary-btn";
@@ -332,6 +441,7 @@ async function startGame(level) {
 ========================================================= */
 
 function showQuestion() {
+
     clearTimer();
 
     if (!state.gameActive) {
@@ -355,6 +465,7 @@ function showQuestion() {
         item.question;
 
     state.answered = false;
+
     state.timeLeft =
         QUESTION_TIME;
 
@@ -372,8 +483,11 @@ function showQuestion() {
         shuffle(item.options);
 
     options.forEach(option => {
+
         const button =
-            document.createElement("button");
+            document.createElement(
+                "button"
+            );
 
         button.className =
             "option-btn";
@@ -386,6 +500,7 @@ function showQuestion() {
         button.addEventListener(
             "click",
             () => {
+
                 answerQuestion(
                     option,
                     button
@@ -402,8 +517,11 @@ function showQuestion() {
 
     state.timer =
         setInterval(() => {
+
             if (!state.gameActive) {
+
                 clearTimer();
+
                 return;
             }
 
@@ -414,9 +532,12 @@ function showQuestion() {
             if (
                 state.timeLeft <= 0
             ) {
+
                 clearTimer();
+
                 timeExpired();
             }
+
         }, 1000);
 }
 
@@ -426,6 +547,7 @@ function showQuestion() {
 ========================================================= */
 
 function updateTimer() {
+
     const minutes =
         Math.floor(
             state.timeLeft / 60
@@ -444,13 +566,18 @@ function updateTimer() {
         "danger"
     );
 
-    if (state.timeLeft <= 10) {
+    if (
+        state.timeLeft <= 10
+    ) {
+
         timerElement.classList.add(
             "danger"
         );
+
     } else if (
         state.timeLeft <= 30
     ) {
+
         timerElement.classList.add(
             "warning"
         );
@@ -463,6 +590,7 @@ function updateTimer() {
 ========================================================= */
 
 function normalizeText(value) {
+
     return String(value ?? "")
         .trim()
         .replace(/ي/g, "ی")
@@ -475,7 +603,11 @@ function normalizeText(value) {
 ========================================================= */
 
 function getCorrectAnswer(question) {
-    return question["پاسخ صحیح"] || "";
+
+    return (
+        question["پاسخ صحیح"] ||
+        ""
+    );
 }
 
 
@@ -487,6 +619,7 @@ function isCorrect(
     selectedAnswer,
     question
 ) {
+
     return (
         normalizeText(
             selectedAnswer
@@ -506,6 +639,7 @@ function answerQuestion(
     selectedAnswer,
     selectedButton
 ) {
+
     if (
         !state.gameActive ||
         state.answered
@@ -541,7 +675,9 @@ function answerQuestion(
     });
 
     if (correct) {
+
         state.score += 100;
+
         state.correctAnswers++;
 
         selectedButton.classList.add(
@@ -549,6 +685,7 @@ function answerQuestion(
         );
 
     } else {
+
         state.wrongAnswers++;
 
         selectedButton.classList.add(
@@ -565,6 +702,7 @@ function answerQuestion(
             getCorrectAnswer(question);
 
         buttons.forEach(button => {
+
             if (
                 normalizeText(
                     button.textContent
@@ -573,6 +711,7 @@ function answerQuestion(
                     correctAnswer
                 )
             ) {
+
                 button.classList.add(
                     "correct"
                 );
@@ -596,6 +735,7 @@ function answerQuestion(
 ========================================================= */
 
 function timeExpired() {
+
     if (
         !state.gameActive ||
         state.answered
@@ -604,6 +744,7 @@ function timeExpired() {
     }
 
     state.answered = true;
+
     state.unanswered++;
 
     const buttons =
@@ -626,6 +767,7 @@ function timeExpired() {
 ========================================================= */
 
 function nextQuestion() {
+
     if (!state.gameActive) {
         return;
     }
@@ -636,8 +778,11 @@ function nextQuestion() {
         state.currentQuestion >=
         state.questions.length
     ) {
+
         finishGame();
+
     } else {
+
         showQuestion();
     }
 }
@@ -648,37 +793,41 @@ function nextQuestion() {
 ========================================================= */
 
 function clearTimer() {
+
     if (state.timer !== null) {
-        clearInterval(state.timer);
+
+        clearInterval(
+            state.timer
+        );
+
         state.timer = null;
     }
 }
 
 
 /* =========================================================
-CSS انیمیشن امتیاز کامل
+استایل انیمیشن امتیاز کامل
 ========================================================= */
 
 function addPerfectAnimationStyles() {
 
-    if (perfectAnimationStyleAdded) {
+    if (perfectStyleAdded) {
         return;
     }
 
     const style =
-        document.createElement("style");
+        document.createElement(
+            "style"
+        );
 
     style.id =
-        "perfect-score-animation-style";
+        "perfect-score-style";
 
     style.textContent = `
 
-        .perfect-overlay {
+        .perfect-screen {
             position: fixed !important;
-            top: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            left: 0 !important;
+            inset: 0 !important;
 
             width: 100vw !important;
             height: 100vh !important;
@@ -691,30 +840,22 @@ function addPerfectAnimationStyles() {
 
             overflow: hidden !important;
 
-            margin: 0 !important;
-            padding: 0 !important;
-
-            box-sizing: border-box !important;
-
             background:
-                radial-gradient(
-                    circle at center,
-                    #303d60 0%,
-                    #151c30 42%,
-                    #05070d 100%
+                linear-gradient(
+                    180deg,
+                    #111827 0%,
+                    #0b1020 100%
                 ) !important;
 
-            opacity: 1 !important;
-
-            isolation: isolate !important;
+            box-sizing: border-box !important;
         }
 
-
-        .perfect-content {
+        .perfect-box {
             position: relative !important;
 
+            z-index: 20 !important;
+
             width: 100% !important;
-            height: 100% !important;
 
             display: flex !important;
             flex-direction: column !important;
@@ -723,118 +864,41 @@ function addPerfectAnimationStyles() {
             justify-content: center !important;
 
             text-align: center !important;
-
-            z-index: 10 !important;
-
-            overflow: hidden !important;
-
-            box-sizing: border-box !important;
         }
-
-
-        .perfect-glow {
-            position: absolute !important;
-
-            width: 330px !important;
-            height: 330px !important;
-
-            border-radius: 50% !important;
-
-            background:
-                radial-gradient(
-                    circle,
-                    rgba(255,215,70,0.48),
-                    rgba(255,193,7,0.18) 40%,
-                    transparent 72%
-                ) !important;
-
-            filter: blur(7px) !important;
-
-            z-index: 1 !important;
-
-            animation:
-                perfectGlow
-                2s ease-in-out infinite !important;
-        }
-
-
-        .perfect-ring {
-            position: absolute !important;
-
-            width: 300px !important;
-            height: 300px !important;
-
-            border:
-                2px solid
-                rgba(255,215,70,0.28) !important;
-
-            border-radius: 50% !important;
-
-            z-index: 2 !important;
-
-            animation:
-                perfectRing
-                2.8s ease-in-out infinite !important;
-        }
-
-
-        .perfect-ring.two {
-            width: 430px !important;
-            height: 430px !important;
-
-            animation-delay: 0.4s !important;
-        }
-
-
-        .perfect-ring.three {
-            width: 580px !important;
-            height: 580px !important;
-
-            animation-delay: 0.8s !important;
-        }
-
 
         .perfect-trophy {
-            position: relative !important;
-
-            z-index: 20 !important;
-
-            font-size: 105px !important;
+            font-size: 100px !important;
 
             line-height: 1 !important;
+
+            margin-bottom: 20px !important;
 
             opacity: 0 !important;
 
             transform:
-                translateY(100px)
-                scale(0.35) !important;
+                scale(.2)
+                translateY(40px) !important;
 
             filter:
                 drop-shadow(
                     0 0 12px
-                    rgba(255,215,70,1)
+                    rgba(255,193,7,.9)
                 )
                 drop-shadow(
                     0 0 35px
-                    rgba(255,193,7,0.9)
+                    rgba(255,193,7,.6)
                 ) !important;
 
             animation:
-                perfectTrophy
-                1s
+                trophyAppear
+                .9s
                 cubic-bezier(.17,.89,.32,1.28)
                 forwards !important;
         }
 
+        .perfect-number {
+            font-size: 86px !important;
 
-        .perfect-score-number {
-            position: relative !important;
-
-            z-index: 20 !important;
-
-            margin-top: 12px !important;
-
-            font-size: 88px !important;
             font-weight: 900 !important;
 
             line-height: 1 !important;
@@ -842,181 +906,94 @@ function addPerfectAnimationStyles() {
             color: #ffd54f !important;
 
             text-shadow:
-                0 0 10px rgba(255,215,70,1),
-                0 0 25px rgba(255,193,7,0.9),
-                0 0 50px rgba(255,193,7,0.55) !important;
+                0 0 12px
+                rgba(255,193,7,.9),
+                0 0 30px
+                rgba(255,193,7,.6) !important;
 
             opacity: 0 !important;
 
-            transform: scale(0.2) !important;
-
             animation:
-                perfectScore
-                0.9s
-                cubic-bezier(.17,.89,.32,1.28)
-                0.6s
+                numberAppear
+                .8s
+                ease
+                .5s
                 forwards !important;
         }
-
 
         .perfect-title {
-            position: relative !important;
-
-            z-index: 20 !important;
-
             margin-top: 22px !important;
 
-            font-size: 28px !important;
+            font-size: 27px !important;
+
             font-weight: 900 !important;
 
-            color: #fff4b0 !important;
-
-            text-shadow:
-                0 0 12px
-                rgba(255,215,70,0.7) !important;
+            color: #ffffff !important;
 
             opacity: 0 !important;
 
             animation:
-                perfectText
-                0.7s
+                textAppear
+                .7s
                 ease
-                1.3s
+                1.1s
                 forwards !important;
         }
-
 
         .perfect-subtitle {
-            position: relative !important;
+            margin-top: 10px !important;
 
-            z-index: 20 !important;
+            padding: 0 20px !important;
 
-            margin-top: 12px !important;
-
-            padding: 0 24px !important;
-
-            font-size: 17px !important;
-
-            line-height: 1.9 !important;
+            font-size: 16px !important;
 
             color:
-                rgba(255,255,255,0.9) !important;
+                rgba(255,255,255,.75) !important;
 
             opacity: 0 !important;
 
             animation:
-                perfectText
-                0.7s
+                textAppear
+                .7s
                 ease
-                1.6s
+                1.4s
                 forwards !important;
         }
 
+        @keyframes trophyAppear {
 
-        .perfect-particle {
-            position: absolute !important;
-
-            z-index: 5 !important;
-
-            width: 5px;
-            height: 5px;
-
-            border-radius: 50% !important;
-
-            background: #ffd54f !important;
-
-            box-shadow:
-                0 0 8px #ffd54f,
-                0 0 18px #ffb300 !important;
-
-            animation:
-                perfectParticle
-                linear
-                infinite !important;
-        }
-
-
-        .perfect-confetti {
-            position: absolute !important;
-
-            top: -30px !important;
-
-            z-index: 15 !important;
-
-            width: 8px;
-            height: 15px;
-
-            border-radius: 2px !important;
-
-            animation:
-                perfectConfetti
-                linear
-                forwards !important;
-        }
-
-
-        @keyframes perfectGlow {
-            0%, 100% {
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-
-            50% {
-                transform: scale(1.2);
-                opacity: 1;
-            }
-        }
-
-
-        @keyframes perfectRing {
-            0%, 100% {
-                transform: scale(0.88);
-                opacity: 0.12;
-            }
-
-            50% {
-                transform: scale(1.08);
-                opacity: 0.42;
-            }
-        }
-
-
-        @keyframes perfectTrophy {
             0% {
                 opacity: 0;
                 transform:
-                    translateY(130px)
-                    scale(0.25)
-                    rotate(-15deg);
+                    scale(.2)
+                    translateY(60px);
             }
 
-            65% {
+            70% {
                 opacity: 1;
                 transform:
-                    translateY(-12px)
                     scale(1.12)
-                    rotate(4deg);
+                    translateY(-5px);
             }
 
             100% {
                 opacity: 1;
                 transform:
-                    translateY(0)
                     scale(1)
-                    rotate(0);
+                    translateY(0);
             }
         }
 
+        @keyframes numberAppear {
 
-        @keyframes perfectScore {
             0% {
                 opacity: 0;
-                transform: scale(0.15);
+                transform: scale(.2);
             }
 
-            65% {
+            70% {
                 opacity: 1;
-                transform: scale(1.18);
+                transform: scale(1.12);
             }
 
             100% {
@@ -1025,72 +1002,28 @@ function addPerfectAnimationStyles() {
             }
         }
 
+        @keyframes textAppear {
 
-        @keyframes perfectText {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform:
+                    translateY(18px);
             }
 
             to {
                 opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-
-        @keyframes perfectParticle {
-            0% {
                 transform:
-                    translateY(110vh)
-                    scale(0.4)
-                    rotate(0deg);
-
-                opacity: 0;
-            }
-
-            15% {
-                opacity: 1;
-            }
-
-            85% {
-                opacity: 1;
-            }
-
-            100% {
-                transform:
-                    translateY(-15vh)
-                    scale(1)
-                    rotate(360deg);
-
-                opacity: 0;
-            }
-        }
-
-
-        @keyframes perfectConfetti {
-            0% {
-                transform:
-                    translateY(-30px)
-                    rotate(0deg);
-
-                opacity: 1;
-            }
-
-            100% {
-                transform:
-                    translateY(115vh)
-                    rotate(720deg);
-
-                opacity: 0;
+                    translateY(0);
             }
         }
 
     `;
 
-    document.head.appendChild(style);
+    document.head.appendChild(
+        style
+    );
 
-    perfectAnimationStyleAdded = true;
+    perfectStyleAdded = true;
 }
 
 
@@ -1098,64 +1031,46 @@ function addPerfectAnimationStyles() {
 اجرای انیمیشن امتیاز کامل
 ========================================================= */
 
-function showPerfectScoreAnimation() {
+async function showPerfectScoreAnimation() {
 
     addPerfectAnimationStyles();
 
-    const oldOverlay =
+    const old =
         document.querySelector(
-            ".perfect-overlay"
+            ".perfect-screen"
         );
 
-    if (oldOverlay) {
-        oldOverlay.remove();
+    if (old) {
+        old.remove();
     }
 
 
+    /* -----------------------------------------
+       ساخت صفحه جشن
+    ----------------------------------------- */
+
     const overlay =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     overlay.className =
-        "perfect-overlay";
+        "perfect-screen";
 
 
-    const content =
-        document.createElement("div");
+    const box =
+        document.createElement(
+            "div"
+        );
 
-    content.className =
-        "perfect-content";
-
-
-    const glow =
-        document.createElement("div");
-
-    glow.className =
-        "perfect-glow";
-
-
-    const ring1 =
-        document.createElement("div");
-
-    ring1.className =
-        "perfect-ring";
-
-
-    const ring2 =
-        document.createElement("div");
-
-    ring2.className =
-        "perfect-ring two";
-
-
-    const ring3 =
-        document.createElement("div");
-
-    ring3.className =
-        "perfect-ring three";
+    box.className =
+        "perfect-box";
 
 
     const trophy =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     trophy.className =
         "perfect-trophy";
@@ -1164,18 +1079,22 @@ function showPerfectScoreAnimation() {
         "🏆";
 
 
-    const score =
-        document.createElement("div");
+    const number =
+        document.createElement(
+            "div"
+        );
 
-    score.className =
-        "perfect-score-number";
+    number.className =
+        "perfect-number";
 
-    score.textContent =
+    number.textContent =
         "۰";
 
 
     const title =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     title.className =
         "perfect-title";
@@ -1185,32 +1104,36 @@ function showPerfectScoreAnimation() {
 
 
     const subtitle =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     subtitle.className =
         "perfect-subtitle";
 
     subtitle.textContent =
-        "شما هر ۷ سؤال را درست پاسخ دادید";
+        "هر ۷ سؤال را درست پاسخ دادید";
 
 
-    content.appendChild(glow);
+    box.appendChild(
+        trophy
+    );
 
-    content.appendChild(ring1);
-    content.appendChild(ring2);
-    content.appendChild(ring3);
+    box.appendChild(
+        number
+    );
 
-    content.appendChild(trophy);
-    content.appendChild(score);
-    content.appendChild(title);
-    content.appendChild(subtitle);
+    box.appendChild(
+        title
+    );
 
-    overlay.appendChild(content);
+    box.appendChild(
+        subtitle
+    );
 
-
-    /* -----------------------------------------
-       نمایش مستقیم روی کل صفحه
-    ----------------------------------------- */
+    overlay.appendChild(
+        box
+    );
 
     document.body.appendChild(
         overlay
@@ -1218,90 +1141,65 @@ function showPerfectScoreAnimation() {
 
 
     /* -----------------------------------------
-       ذرات نور
+       بارگذاری کتابخانه
     ----------------------------------------- */
 
-    for (let i = 0; i < 35; i++) {
-
-        const particle =
-            document.createElement("div");
-
-        particle.className =
-            "perfect-particle";
-
-        particle.style.left =
-            Math.random() * 100 + "%";
-
-        particle.style.animationDuration =
-            (3 + Math.random() * 5) + "s";
-
-        particle.style.animationDelay =
-            Math.random() * 3 + "s";
-
-        const size =
-            2 + Math.random() * 5;
-
-        particle.style.width =
-            size + "px";
-
-        particle.style.height =
-            size + "px";
-
-        overlay.appendChild(
-            particle
-        );
-    }
+    await loadConfettiLibrary();
 
 
     /* -----------------------------------------
-       Confetti
+       کنفتی آماده
     ----------------------------------------- */
 
-    const confettiColors = [
-        "#FFD54F",
-        "#FFB300",
-        "#FFF176",
-        "#FFFFFF",
-        "#F5C542"
-    ];
+    if (
+        confettiReady &&
+        typeof window.confetti ===
+        "function"
+    ) {
 
-    for (let i = 0; i < 100; i++) {
+        setTimeout(() => {
 
-        const piece =
-            document.createElement("div");
+            try {
 
-        piece.className =
-            "perfect-confetti";
+                window.confetti.celebrate({
+                    particleCount: 180
+                });
 
-        piece.style.left =
-            Math.random() * 100 + "%";
+            } catch (error) {
 
-        piece.style.animationDuration =
-            (2.5 + Math.random() * 3.5) + "s";
+                console.warn(
+                    "Confetti error:",
+                    error
+                );
 
-        piece.style.animationDelay =
-            Math.random() * 1.2 + "s";
+                try {
+                    window.confetti({
+                        particleCount: 180,
+                        spread: 100,
+                        origin: {
+                            x: 0.5,
+                            y: 0.65
+                        }
+                    });
+                } catch (_) {}
+            }
 
-        piece.style.background =
-            confettiColors[
-                Math.floor(
-                    Math.random() *
-                    confettiColors.length
-                )
-            ];
+        }, 250);
 
-        const width =
-            5 + Math.random() * 7;
 
-        piece.style.width =
-            width + "px";
+        setTimeout(() => {
 
-        piece.style.height =
-            width * 1.7 + "px";
+            try {
 
-        overlay.appendChild(
-            piece
-        );
+                window.confetti.fireworks({
+                    duration: 1800,
+                    interval: 300
+                });
+
+            } catch (_) {}
+
+        }, 900);
+
     }
 
 
@@ -1309,12 +1207,13 @@ function showPerfectScoreAnimation() {
        شمارش ۰ تا ۷۰۰
     ----------------------------------------- */
 
-    const duration = 1500;
+    const duration =
+        1500;
 
     const start =
         performance.now();
 
-    function updateScore(now) {
+    function animateScore(now) {
 
         if (
             !overlay.parentNode
@@ -1324,7 +1223,8 @@ function showPerfectScoreAnimation() {
 
         const progress =
             Math.min(
-                (now - start) / duration,
+                (now - start) /
+                duration,
                 1
             );
 
@@ -1340,30 +1240,33 @@ function showPerfectScoreAnimation() {
                 700 * eased
             );
 
-        score.textContent =
-            toPersianNumber(value);
+        number.textContent =
+            toPersianNumber(
+                value
+            );
 
-        if (progress < 1) {
+        if (
+            progress < 1
+        ) {
 
             requestAnimationFrame(
-                updateScore
+                animateScore
             );
 
         } else {
 
-            score.textContent =
+            number.textContent =
                 "۷۰۰";
         }
     }
 
-
     requestAnimationFrame(
-        updateScore
+        animateScore
     );
 
 
     /* -----------------------------------------
-       پایان انیمیشن
+       پایان
     ----------------------------------------- */
 
     setTimeout(() => {
@@ -1373,6 +1276,13 @@ function showPerfectScoreAnimation() {
             overlay.parentNode
         ) {
             overlay.remove();
+        }
+
+        if (window.confetti) {
+
+            try {
+                window.confetti.reset();
+            } catch (_) {}
         }
 
         showResultScreen();
@@ -1397,20 +1307,29 @@ function showResultScreen() {
 
     let message;
 
-    if (state.score >= 600) {
+    if (
+        state.score >= 600
+    ) {
+
         message =
             "فوق‌العاده! 🌟";
+
     } else if (
         state.score >= 400
     ) {
+
         message =
             "عالی! 👏";
+
     } else if (
         state.score >= 200
     ) {
+
         message =
             "خوب بود! 🌿";
+
     } else {
+
         message =
             "این پایان راه نیست؛ دوباره تلاش کن. 💚";
     }
@@ -1434,8 +1353,12 @@ function finishGame() {
 
     state.gameActive = false;
 
-    if (state.score === 700) {
+    if (
+        state.score === 700
+    ) {
+
         showPerfectScoreAnimation();
+
         return;
     }
 
@@ -1479,7 +1402,6 @@ document
                 }
             }
         );
-
     });
 
 
@@ -1534,7 +1456,6 @@ function initializeSoroushWebApp() {
             ) {
                 webApp.expand();
             }
-
         }
 
     } catch (error) {
@@ -1543,7 +1464,6 @@ function initializeSoroushWebApp() {
             "Soroush WebApp initialization error:",
             error
         );
-
     }
 }
 
